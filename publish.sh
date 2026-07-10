@@ -5,6 +5,6 @@ cd "$(dirname "$0")/src/MountTool"
 
 for rid in win-x64 osx-arm64 osx-x64 linux-x64; do
     dotnet publish -r "$rid" -c Release --self-contained \
-        -p:PublishSingleFile=true -p:DebugType=none \
+        -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none \
         -o "../../dist/$rid"
 done
