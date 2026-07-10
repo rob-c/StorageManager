@@ -21,18 +21,40 @@ public static class Askpass
     {
         var password = Environment.GetEnvironmentVariable(PasswordVariable);
 
-        if (password is not null && prompt.Contains("'s password", StringComparison.OrdinalIgnoreCase))
+        // Two login-prompt shapes get the stored password: password auth
+        // ("user@host's password:") and PAM keyboard-interactive, which sends
+        // a bare "Password:" optionally prefixed with "(user@host)". Longer
+        // texts (e.g. "One-time password (OATH)...") are challenges for the
+        // user and go to the dialog.
+        var isLoginPasswordPrompt =
+            prompt.Contains("'s password", StringComparison.OrdinalIgnoreCase)
+            || System.Text.RegularExpressions.Regex.IsMatch(
+                prompt, @"^\s*(\([^)]*\)\s*)?Password\s*:\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (password is not null && isLoginPasswordPrompt)
         {
+            Log($"prompt=[{prompt}] -> silent password");
             Console.Out.Write(password);
             Console.Out.Flush();
             return 0;
         }
 
-        AskpassApp.Prompt = prompt;
-        AppBuilder.Configure<AskpassApp>()
-            .UsePlatformDetect()
-            .WithInterFont()
-            .StartWithClassicDesktopLifetime([]);
+        Log($"prompt=[{prompt}] -> dialog");
+        try
+        {
+            AskpassApp.Prompt = prompt;
+            AppBuilder.Configure<AskpassApp>()
+                .UsePlatformDetect()
+                .WithInterFont()
+                .StartWithClassicDesktopLifetime([]);
+        }
+        catch (Exception ex)
+        {
+            Log($"dialog failed: {ex}");
+            return 1;
+        }
+
+        Log($"dialog result: {(AskpassApp.Response is null ? "cancelled" : $"{AskpassApp.Response.Length} chars")}");
 
         if (AskpassApp.Response is null)
             return 1;
@@ -40,6 +62,22 @@ public static class Askpass
         Console.Out.Write(AskpassApp.Response);
         Console.Out.Flush();
         return 0;
+    }
+
+    /// <summary>With PPE_DEBUG set, appends askpass activity to ppe-askpass.log in the temp directory.</summary>
+    private static void Log(string message)
+    {
+        if (Environment.GetEnvironmentVariable("PPE_DEBUG") is null)
+            return;
+        try
+        {
+            File.AppendAllText(Path.Combine(Path.GetTempPath(), "ppe-askpass.log"),
+                $"{DateTime.Now:HH:mm:ss.fff} pid={Environment.ProcessId} {message}\n");
+        }
+        catch
+        {
+            // Diagnostics must never break authentication.
+        }
     }
 }
 
