@@ -37,5 +37,86 @@ public sealed class LinuxMounter(Config config) : UnixMounterBase(config)
         RunQuiet("fusermount", "-uz", Target);
     });
 
-    public override void OpenInFileManager() => OpenPath("xdg-open", Target);
+    private static readonly string[] KnownFileManagers =
+        ["dolphin", "nautilus", "thunar", "nemo", "pcmanfm", "caja"];
+
+    public override void OpenInFileManager()
+    {
+        // The desktop's inode/directory association can point at a text
+        // editor (e.g. kate), so only honour it when it names a real file
+        // manager; otherwise fall back through known managers.
+        var handler = QueryDefaultDirectoryHandler();
+        if (handler is not null
+            && KnownFileManagers.Any(m => handler.Contains(m, StringComparison.OrdinalIgnoreCase))
+            && FindOnPath("gtk-launch") is not null)
+        {
+            try
+            {
+                var info = new System.Diagnostics.ProcessStartInfo("gtk-launch") { UseShellExecute = false };
+                info.ArgumentList.Add(handler);
+                info.ArgumentList.Add(Target);
+                System.Diagnostics.Process.Start(info);
+                return;
+            }
+            catch
+            {
+                // Fall through to the known managers.
+            }
+        }
+
+        foreach (var manager in KnownFileManagers)
+        {
+            if (FindOnPath(manager) is { } path)
+            {
+                OpenPath(path, Target);
+                return;
+            }
+        }
+
+        // Under WSL with no Linux file manager, open in Windows Explorer.
+        if (Environment.GetEnvironmentVariable("WSL_DISTRO_NAME") is not null
+            && FindOnPath("wslpath") is not null)
+        {
+            var windowsPath = QueryProcessOutput("wslpath", "-w", Target);
+            if (!string.IsNullOrWhiteSpace(windowsPath))
+            {
+                OpenPath("explorer.exe", windowsPath);
+                return;
+            }
+        }
+
+        OpenPath("xdg-open", Target);
+    }
+
+    private static string? QueryDefaultDirectoryHandler()
+    {
+        var output = QueryProcessOutput("xdg-mime", "query", "default", "inode/directory");
+        return output is not null && output.EndsWith(".desktop") ? output : null;
+    }
+
+    private static string? QueryProcessOutput(string fileName, params string[] arguments)
+    {
+        try
+        {
+            var info = new System.Diagnostics.ProcessStartInfo(fileName)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+            };
+            foreach (var arg in arguments)
+                info.ArgumentList.Add(arg);
+
+            using var process = System.Diagnostics.Process.Start(info);
+            if (process is null)
+                return null;
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit(5000);
+            return output;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
