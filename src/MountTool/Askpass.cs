@@ -33,9 +33,9 @@ public static class Askpass
 
         if (password is not null && isLoginPasswordPrompt)
         {
-            Log($"prompt=[{prompt}] -> silent password");
-            Console.Out.Write(password);
-            Console.Out.Flush();
+            Log($"prompt=[{prompt}] -> silent password len={password.Length} " +
+                $"ascii={password.All(char.IsAscii)} encoding={Console.OutputEncoding.WebName}");
+            WriteRawUtf8(password);
             return 0;
         }
 
@@ -59,9 +59,16 @@ public static class Askpass
         if (AskpassApp.Response is null)
             return 1;
 
-        Console.Out.Write(AskpassApp.Response);
-        Console.Out.Flush();
+        WriteRawUtf8(AskpassApp.Response);
         return 0;
+    }
+
+    /// <summary>Writes to stdout as raw UTF-8 bytes, immune to console codepage translation.</summary>
+    private static void WriteRawUtf8(string text)
+    {
+        using var stdout = Console.OpenStandardOutput();
+        stdout.Write(System.Text.Encoding.UTF8.GetBytes(text));
+        stdout.Flush();
     }
 
     /// <summary>With PPE_DEBUG set, appends askpass activity to ppe-askpass.log in the temp directory.</summary>
