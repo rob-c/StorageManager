@@ -49,6 +49,10 @@ public partial class MainWindow : Window
 
         if (_baseConfig is not null)
         {
+            HostBox.Items.Add(_baseConfig.Gateway);
+            HostBox.Items.Add(new ComboBoxItem { Content = "Other…", IsEnabled = false });
+            HostBox.SelectedIndex = 0;
+
             InitializeRemoteOptions();
             InitializeMountTarget();
             UsernameBox.TextChanged += (_, _) => RefreshRemoteOptionTexts();
@@ -178,7 +182,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var mounter = CreateMounter(_baseConfig with { RemotePath = remotePath, MountTarget = target });
+        var gateway = HostBox.SelectedItem as string ?? _baseConfig.Gateway;
+        var mounter = CreateMounter(_baseConfig with
+        {
+            Gateway = gateway,
+            RemotePath = remotePath,
+            MountTarget = target,
+        });
 
         if (mounter.Preflight() is { } problem)
         {
@@ -264,6 +274,7 @@ public partial class MainWindow : Window
     {
         UsernameBox.IsEnabled = enabled;
         PasswordBox.IsEnabled = enabled;
+        HostBox.IsEnabled = enabled;
         RemoteBox.IsEnabled = enabled;
         TargetBox.IsEnabled = enabled;
         DriveBox.IsEnabled = enabled;

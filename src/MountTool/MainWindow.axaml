@@ -26,6 +26,10 @@
                Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
     <TextBox x:Name="PasswordBox" PasswordChar="●" Watermark="university password" Margin="0,0,0,8" />
 
+    <TextBlock Text="Remote host" FontSize="12"
+               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+    <ComboBox x:Name="HostBox" HorizontalAlignment="Stretch" Margin="0,0,0,8" />
+
     <TextBlock Text="Remote folder" FontSize="12"
                Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
     <ComboBox x:Name="RemoteBox" HorizontalAlignment="Stretch" Margin="0,0,0,8" />
