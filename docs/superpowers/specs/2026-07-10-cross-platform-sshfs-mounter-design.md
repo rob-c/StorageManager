@@ -145,3 +145,15 @@ Links are clickable (opens default browser).
 
 - In-app editing of server settings (JSON file covers it for now).
 - System tray mode, auto-reconnect UI, key-based auth, saved credentials.
+
+## Amendment (2026-07-10): selectable remote path and mount location
+
+- **Remote folder dropdown** with `/home/$USER`, `/storage/datastore-personal/$USER`,
+  `/storage/datastore-group/PPE` (default), and a greyed-out "Other…" placeholder.
+  `$USER` is the university username from the form, substituted live.
+  A `remotePath` from `mount-config.json` outside this list appears as an extra
+  option and becomes the default.
+- **Mount location control**: editable absolute path pre-filled with `~/S` on
+  macOS/Linux; a dropdown of free drive letters (D:–Z:) pre-selected to `S:`
+  (or the configured `mountTarget`) on Windows.
+- A fresh `IMounter` is constructed per Connect with the chosen values.
