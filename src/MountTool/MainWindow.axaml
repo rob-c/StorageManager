@@ -1,0 +1,20 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MountTool.MainWindow"
+        Title="PPE Storage"
+        Width="460" SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen">
+  <StackPanel Margin="20" Spacing="8">
+    <TextBlock Text="University username" />
+    <TextBox x:Name="UsernameBox" />
+    <TextBlock Text="University password" Margin="0,8,0,0" />
+    <TextBox x:Name="PasswordBox" PasswordChar="●" />
+    <TextBlock x:Name="StatusLabel" Text="Not connected." Margin="0,10,0,0" />
+    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,10,0,0">
+      <Button x:Name="ConnectButton" Content="Connect" MinWidth="120" IsDefault="True" Click="OnConnect" />
+      <Button x:Name="OpenButton" Content="Open" MinWidth="120" IsEnabled="False" Click="OnOpen" />
+      <Button x:Name="DisconnectButton" Content="Disconnect" MinWidth="120" IsEnabled="False" Click="OnDisconnect" />
+    </StackPanel>
+  </StackPanel>
+</Window>

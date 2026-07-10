@@ -1,0 +1,239 @@
+using System.Diagnostics;
+using System.Text;
+
+namespace MountTool.Mounting;
+
+public abstract class MounterBase(Config config) : IMounter
+{
+    protected static readonly TimeSpan MountTimeout = TimeSpan.FromSeconds(20);
+
+    protected Config Config { get; } = config;
+    protected Process? SshfsProcess { get; private set; }
+
+    private Task<string>? _stdout;
+    private Task<string>? _stderr;
+
+    public abstract string TargetDescription { get; }
+
+    public bool IsMounted =>
+        SshfsProcess is { HasExited: false } && TargetPresent();
+
+    public abstract string? Preflight();
+    public abstract void OpenInFileManager();
+
+    /// <summary>Full path to the sshfs executable, or null if not installed.</summary>
+    protected abstract string? FindSshfs();
+
+    /// <summary>True when the drive letter / mount point is live.</summary>
+    protected abstract bool TargetPresent();
+
+    /// <summary>The sshfs mount target argument ("S:" or an absolute directory).</summary>
+    protected abstract string MountTarget { get; }
+
+    protected virtual IEnumerable<string> ExtraSshfsArguments => [];
+    protected virtual void ConfigureEnvironment(ProcessStartInfo startInfo) { }
+    protected virtual void PrepareTarget() { }
+    protected virtual void CleanupTarget() { }
+
+    /// <summary>Platform-specific unmount of a live mount; killing the process is handled here.</summary>
+    protected virtual Task PlatformUnmountAsync() => Task.CompletedTask;
+
+    public async Task<string?> MountAsync(string username, string password)
+    {
+        var sshfs = FindSshfs();
+        if (sshfs is null)
+            return Preflight() ?? "sshfs was not found.";
+
+        PrepareTarget();
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = sshfs,
+            WorkingDirectory = Path.GetDirectoryName(sshfs) ?? "",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        foreach (var arg in BuildArguments(username))
+            startInfo.ArgumentList.Add(arg);
+
+        ConfigureEnvironment(startInfo);
+
+        Process process;
+        try
+        {
+            process = Process.Start(startInfo) ?? throw new InvalidOperationException("sshfs did not start.");
+        }
+        catch (Exception ex)
+        {
+            return $"sshfs could not be started.\n\n{ex.Message}";
+        }
+
+        SshfsProcess = process;
+
+        // Drain output immediately so neither pipe can block sshfs.
+        _stdout = process.StandardOutput.ReadToEndAsync();
+        _stderr = process.StandardError.ReadToEndAsync();
+
+        // The password travels via stdin only.
+        await process.StandardInput.WriteLineAsync(password);
+        await process.StandardInput.FlushAsync();
+        process.StandardInput.Close();
+
+        var deadline = DateTime.UtcNow + MountTimeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            process.Refresh();
+            if (process.HasExited)
+                break;
+            if (TargetPresent())
+                return null;
+            await Task.Delay(200);
+        }
+
+        var exitCode = 1;
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(3000);
+            }
+            exitCode = process.ExitCode;
+        }
+        catch
+        {
+            // Best effort.
+        }
+
+        var diagnostics = await CollectOutputAsync();
+        await UnmountAsync();
+
+        return $"The storage could not be mounted.\n\nsshfs exit code: {exitCode}\n\n{diagnostics}";
+    }
+
+    public async Task UnmountAsync()
+    {
+        var process = SshfsProcess;
+        SshfsProcess = null;
+
+        if (process is not null)
+        {
+            try
+            {
+                process.Refresh();
+                if (!process.HasExited)
+                {
+                    await PlatformUnmountAsync();
+                    process.Refresh();
+                    if (!process.HasExited)
+                    {
+                        process.Kill(entireProcessTree: true);
+                        process.WaitForExit(5000);
+                    }
+                }
+            }
+            catch
+            {
+                // It may already have exited.
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+
+        // Give the FUSE layer a moment to release the target.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (TargetPresent() && DateTime.UtcNow < deadline)
+            await Task.Delay(100);
+
+        _stdout = _stderr = null;
+        CleanupTarget();
+    }
+
+    private List<string> BuildArguments(string username) =>
+    [
+        $"{username}@{Config.Gateway}:{Config.RemotePath}",
+        MountTarget,
+        "-f",
+        "-o", "password_stdin",
+        "-o", "PreferredAuthentications=password",
+        "-o", "PubkeyAuthentication=no",
+        "-o", "NumberOfPasswordPrompts=1",
+        "-o", "ConnectTimeout=10",
+        "-o", "StrictHostKeyChecking=accept-new",
+        "-o", "reconnect",
+        "-o", "ServerAliveInterval=30",
+        "-o", "ServerAliveCountMax=3",
+        .. ExtraSshfsArguments,
+    ];
+
+    private async Task<string> CollectOutputAsync()
+    {
+        var text = new StringBuilder();
+        foreach (var task in new[] { _stderr, _stdout })
+        {
+            if (task is null)
+                continue;
+            try
+            {
+                text.AppendLine((await task).Trim());
+            }
+            catch
+            {
+                // Pipe already broken.
+            }
+        }
+
+        var message = text.ToString().Trim();
+        if (message.Length == 0)
+            return "sshfs produced no diagnostic output.";
+        if (message.Length > 1800)
+            message = "[Earlier output omitted]\n\n" + message[^1800..];
+        return message;
+    }
+
+    protected static string? FindOnPath(string name, params string[] extraDirectories)
+    {
+        var directories = (Environment.GetEnvironmentVariable("PATH") ?? "")
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Concat(extraDirectories);
+
+        return directories
+            .Select(dir => Path.Combine(dir, name))
+            .FirstOrDefault(File.Exists);
+    }
+
+    protected static int RunQuiet(string fileName, params string[] arguments)
+    {
+        try
+        {
+            var info = new ProcessStartInfo(fileName) { UseShellExecute = false, CreateNoWindow = true };
+            foreach (var arg in arguments)
+                info.ArgumentList.Add(arg);
+            using var process = Process.Start(info);
+            process?.WaitForExit(10000);
+            return process?.ExitCode ?? -1;
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
+    protected static void OpenPath(string opener, string path)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(opener, path) { UseShellExecute = false });
+        }
+        catch
+        {
+            // Non-fatal.
+        }
+    }
+}
