@@ -69,6 +69,12 @@ public static class Askpass
     {
         if (Environment.GetEnvironmentVariable("PPE_DEBUG") is null)
             return;
+        DebugLog(message);
+    }
+
+    /// <summary>Unconditionally appends to ppe-askpass.log in the temp directory.</summary>
+    public static void DebugLog(string message)
+    {
         try
         {
             File.AppendAllText(Path.Combine(Path.GetTempPath(), "ppe-askpass.log"),

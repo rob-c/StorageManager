@@ -76,6 +76,9 @@ public abstract class MounterBase(Config config) : IMounter
             // Older ssh only consults SSH_ASKPASS when DISPLAY is set.
             if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")))
                 startInfo.EnvironmentVariables["DISPLAY"] = ":0";
+            startInfo.EnvironmentVariables["PPE_DEBUG"] = "1";
+            Askpass.DebugLog($"mount: exe={startInfo.FileName} askpass={AskpassExecutablePath()} " +
+                             $"args=[{string.Join(" ", startInfo.ArgumentList)}]");
         }
 
         Process process;
@@ -129,6 +132,8 @@ public abstract class MounterBase(Config config) : IMounter
         }
 
         var diagnostics = await CollectOutputAsync();
+        if (Config.TwoFactorPam)
+            Askpass.DebugLog($"mount failed: exit={exitCode} diagnostics=[{diagnostics}]");
         await UnmountAsync();
 
         return $"The storage could not be mounted.\n\nsshfs exit code: {exitCode}\n\n{diagnostics}";
