@@ -24,6 +24,7 @@ public partial class MainWindow : Window
         $"/home/{UserToken}",
         $"/storage/datastore-personal/{UserToken}",
         "/storage/datastore-group/PPE",
+        "/scratch",
     ];
 
     private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
