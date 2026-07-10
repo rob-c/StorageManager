@@ -269,11 +269,14 @@ public abstract class MounterBase(Config config) : IMounter
         }
     }
 
-    protected static void OpenPath(string opener, string path)
+    protected static void OpenPath(string opener, params string[] arguments)
     {
         try
         {
-            Process.Start(new ProcessStartInfo(opener, path) { UseShellExecute = false });
+            var info = new ProcessStartInfo(opener) { UseShellExecute = false };
+            foreach (var arg in arguments)
+                info.ArgumentList.Add(arg);
+            Process.Start(info);
         }
         catch
         {

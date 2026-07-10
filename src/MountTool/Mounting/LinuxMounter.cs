@@ -73,16 +73,12 @@ public sealed class LinuxMounter(Config config) : UnixMounterBase(config)
             }
         }
 
-        // Under WSL with no Linux file manager, open in Windows Explorer.
-        if (Environment.GetEnvironmentVariable("WSL_DISTRO_NAME") is not null
-            && FindOnPath("wslpath") is not null)
+        // Desktop's default folder opener. Never Windows explorer.exe, even
+        // under WSL — this is a Linux desktop tool.
+        if (FindOnPath("gio") is { } gio)
         {
-            var windowsPath = QueryProcessOutput("wslpath", "-w", Target);
-            if (!string.IsNullOrWhiteSpace(windowsPath))
-            {
-                OpenPath("explorer.exe", windowsPath);
-                return;
-            }
+            OpenPath(gio, "open", Target);
+            return;
         }
 
         OpenPath("xdg-open", Target);
