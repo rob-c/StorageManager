@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using MountTool.Mounting;
 
 namespace MountTool;
@@ -9,6 +10,11 @@ namespace MountTool;
 public partial class MainWindow : Window
 {
     private const string UserToken = "$USER";
+
+    private static readonly IBrush LedIdle = new SolidColorBrush(Color.Parse("#8A8F98"));
+    private static readonly IBrush LedBusy = new SolidColorBrush(Color.Parse("#FFB454"));
+    private static readonly IBrush LedConnected = new SolidColorBrush(Color.Parse("#2BC5A8"));
+    private static readonly IBrush LedError = new SolidColorBrush(Color.Parse("#E05252"));
 
     private static readonly Regex UsernamePattern = new("^[A-Za-z0-9._-]+$");
 
@@ -73,7 +79,7 @@ public partial class MainWindow : Window
             _remoteTemplates.Add(configured);
 
         foreach (var template in _remoteTemplates)
-            RemoteBox.Items.Add(new ComboBoxItem { Content = template });
+            RemoteBox.Items.Add(template);
 
         RemoteBox.Items.Add(new ComboBoxItem { Content = "Other…", IsEnabled = false });
 
@@ -115,9 +121,18 @@ public partial class MainWindow : Window
     private void RefreshRemoteOptionTexts()
     {
         var username = UsernameBox.Text?.Trim() ?? "";
+        var selected = RemoteBox.SelectedIndex;
+
         for (var i = 0; i < _remoteTemplates.Count; i++)
-            ((ComboBoxItem)RemoteBox.Items[i]!).Content =
-                username.Length == 0 ? _remoteTemplates[i] : _remoteTemplates[i].Replace(UserToken, username);
+        {
+            var display = username.Length == 0
+                ? _remoteTemplates[i]
+                : _remoteTemplates[i].Replace(UserToken, username);
+            if (!display.Equals(RemoteBox.Items[i]))
+                RemoteBox.Items[i] = display;
+        }
+
+        RemoteBox.SelectedIndex = selected;
     }
 
     private static IMounter CreateMounter(Config config) =>
@@ -180,7 +195,7 @@ public partial class MainWindow : Window
         if (error is not null)
         {
             _mounter = null;
-            SetDisconnectedUi("Connection failed.");
+            SetDisconnectedUi("Connection failed.", error: true);
             await Dialogs.ShowMessageAsync(this, "PPE Storage", error);
             PasswordBox.Focus();
             return;
@@ -205,7 +220,7 @@ public partial class MainWindow : Window
         _connected = false;
         await _mounter.UnmountAsync();
         _mounter = null;
-        SetDisconnectedUi("Connection was lost.");
+        SetDisconnectedUi("Connection was lost.", error: true);
     }
 
     private async void OnDisconnect(object? sender, RoutedEventArgs e)
@@ -261,6 +276,7 @@ public partial class MainWindow : Window
         OpenButton.IsEnabled = false;
         DisconnectButton.IsEnabled = false;
         StatusLabel.Text = status;
+        StatusDot.Fill = LedBusy;
     }
 
     private void SetConnectedUi(string username)
@@ -271,16 +287,18 @@ public partial class MainWindow : Window
         DisconnectButton.IsEnabled = true;
         OpenButton.Content = $"Open {_mounter!.TargetDescription}";
         StatusLabel.Text = $"Connected as {username} on {_mounter.TargetDescription}";
+        StatusDot.Fill = LedConnected;
         PasswordBox.Text = "";
     }
 
-    private void SetDisconnectedUi(string status)
+    private void SetDisconnectedUi(string status, bool error = false)
     {
         SetFormEnabled(true);
         ConnectButton.IsEnabled = true;
         OpenButton.IsEnabled = false;
         DisconnectButton.IsEnabled = false;
         StatusLabel.Text = status;
+        StatusDot.Fill = error ? LedError : LedIdle;
         PasswordBox.Text = "";
     }
 }

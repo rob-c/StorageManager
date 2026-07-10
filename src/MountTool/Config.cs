@@ -7,7 +7,7 @@ public sealed record Config(string Gateway, string RemotePath, string? MountTarg
     public const string FileName = "mount-config.json";
 
     public static Config Default { get; } =
-        new("staff.ph.ed.ac.uk", "/storage/datastore-group/PPE", null);
+        new("staff.ph.ed.ac.uk", "/home/$USER", null);
 
     /// <summary>Loads mount-config.json beside the executable if present; throws on malformed content.</summary>
     public static Config Load()
