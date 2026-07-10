@@ -189,8 +189,11 @@ public abstract class MounterBase(Config config) : IMounter
         $"{username}@{Config.Gateway}:{Config.RemotePath}",
         MountTarget,
         "-f",
+        // No comma in the value: Linux FUSE splits comma-separated -o options,
+        // so "keyboard-interactive,password" would leak a bogus "password" mount
+        // option. 2FA hosts use keyboard-interactive exclusively anyway.
         .. Config.TwoFactorPam
-            ? new[] { "-o", "PreferredAuthentications=keyboard-interactive,password" }
+            ? new[] { "-o", "PreferredAuthentications=keyboard-interactive" }
             : ["-o", "password_stdin", "-o", "PreferredAuthentications=password"],
         "-o", "PubkeyAuthentication=no",
         // 2FA needs multiple keyboard-interactive rounds (password, then the
