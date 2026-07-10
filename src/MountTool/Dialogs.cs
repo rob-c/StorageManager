@@ -22,6 +22,7 @@ public static class Dialogs
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             MaxWidth = 560,
         };
+        dialog.Bind(Window.BackgroundProperty, dialog.GetResourceObservable("AppWindowBackground"));
 
         var buttons = new StackPanel
         {

@@ -6,7 +6,18 @@ namespace MountTool;
 
 public class App : Application
 {
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+
+        // Follows the system by default; PPE_THEME=dark|light forces a variant.
+        RequestedThemeVariant = Environment.GetEnvironmentVariable("PPE_THEME")?.ToLowerInvariant() switch
+        {
+            "dark" => Avalonia.Styling.ThemeVariant.Dark,
+            "light" => Avalonia.Styling.ThemeVariant.Light,
+            _ => Avalonia.Styling.ThemeVariant.Default,
+        };
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {

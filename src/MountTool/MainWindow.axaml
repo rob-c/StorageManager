@@ -3,6 +3,7 @@
         x:Class="MountTool.MainWindow"
         Title="PPE Storage"
         Icon="/Assets/logo.png"
+        Background="{DynamicResource AppWindowBackground}"
         Width="440" SizeToContent="Height"
         CanResize="False"
         WindowStartupLocation="CenterScreen">
