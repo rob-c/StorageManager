@@ -133,7 +133,12 @@ public abstract class MounterBase(Config config) : IMounter
 
         var diagnostics = await CollectOutputAsync();
         if (Config.TwoFactorPam)
+        {
+            var delivered = password.TrimEnd('\r', '\n');
+            diagnostics += $"\n\n(Delivered password: {delivered.Length} characters. " +
+                           "If that is not your password's length, re-type it carefully.)";
             Askpass.DebugLog($"mount failed: exit={exitCode} diagnostics=[{diagnostics}]");
+        }
         await UnmountAsync();
 
         return $"The storage could not be mounted.\n\nsshfs exit code: {exitCode}\n\n{diagnostics}";
