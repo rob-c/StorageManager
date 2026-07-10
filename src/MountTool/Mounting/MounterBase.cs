@@ -188,8 +188,8 @@ public abstract class MounterBase(Config config) : IMounter
         // No "-o reconnect": when the server goes away the ssh transport must
         // exit (after ServerAlive gives up) so the watchdog can unmount cleanly.
         "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "ServerAliveInterval=30",
-        "-o", "ServerAliveCountMax=3",
+        "-o", $"ServerAliveInterval={Config.KeepAliveIntervalSeconds}",
+        "-o", $"ServerAliveCountMax={Config.KeepAliveCountMax}",
         .. ExtraSshfsArguments,
     ];
 

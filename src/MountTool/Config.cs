@@ -9,7 +9,9 @@ public sealed record Config(
     string RemotePath,
     string? MountTarget,
     IReadOnlyList<HostEntry>? Hosts = null,
-    bool TwoFactorPam = false)
+    bool TwoFactorPam = false,
+    int KeepAliveIntervalSeconds = 5,
+    int KeepAliveCountMax = 3)
 {
     public const string FileName = "mount-config.json";
 
@@ -47,6 +49,9 @@ public sealed record Config(
 
         if (loaded.Hosts is not { Count: > 0 } && string.IsNullOrWhiteSpace(loaded.Gateway))
             throw new InvalidDataException($"{FileName} must set \"hosts\" or \"gateway\".");
+
+        if (loaded.KeepAliveIntervalSeconds < 1 || loaded.KeepAliveCountMax < 1)
+            throw new InvalidDataException($"{FileName} keep-alive settings must be at least 1.");
 
         return loaded;
     }
