@@ -157,3 +157,15 @@ Links are clickable (opens default browser).
   macOS/Linux; a dropdown of free drive letters (D:–Z:) pre-selected to `S:`
   (or the configured `mountTarget`) on Windows.
 - A fresh `IMounter` is constructed per Connect with the chosen values.
+
+## Amendment (2026-07-10): multiple hosts and PAM two-factor support
+
+- Hosts are config entries `{name, twoFactorPam}`; defaults:
+  staff.ph.ed.ac.uk, phcomputeppe01.ph.ed.ac.uk, t3-mw2.ph.ed.ac.uk (no 2FA)
+  and lxplus.cern.ch (2FA). Legacy `gateway` configs still load.
+- 2FA hosts authenticate via SSH_ASKPASS: the app re-invokes its own binary
+  per ssh prompt (marker env var routes it into askpass mode). The
+  "user@host's password:" prompt is answered silently from the environment;
+  any other prompt (CERN PAM challenge) opens a dialog showing the server's
+  prompt text and returns the user's response. Mount wait extends to 120 s
+  for 2FA hosts, and `keyboard-interactive` replaces `password_stdin`.

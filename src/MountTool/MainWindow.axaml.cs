@@ -51,7 +51,8 @@ public partial class MainWindow : Window
 
         if (_baseConfig is not null)
         {
-            HostBox.Items.Add(_baseConfig.Gateway);
+            foreach (var host in _baseConfig.HostList)
+                HostBox.Items.Add(host.Name);
             HostBox.Items.Add(new ComboBoxItem { Content = "Other…", IsEnabled = false });
             HostBox.SelectedIndex = 0;
 
@@ -199,10 +200,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        var gateway = HostBox.SelectedItem as string ?? _baseConfig.Gateway;
+        var host = _baseConfig.HostList.FirstOrDefault(h => h.Name == HostBox.SelectedItem as string)
+            ?? _baseConfig.HostList[0];
         var mounter = CreateMounter(_baseConfig with
         {
-            Gateway = gateway,
+            Gateway = host.Name,
+            TwoFactorPam = host.TwoFactorPam,
             RemotePath = remotePath,
             MountTarget = target,
         });

@@ -5,7 +5,9 @@ namespace MountTool.Mounting;
 
 public abstract class MounterBase(Config config) : IMounter
 {
-    protected static readonly TimeSpan MountTimeout = TimeSpan.FromSeconds(20);
+    // Two-factor logins wait on a human answering a PAM challenge.
+    private TimeSpan MountTimeout =>
+        Config.TwoFactorPam ? TimeSpan.FromSeconds(120) : TimeSpan.FromSeconds(20);
 
     protected Config Config { get; } = config;
     protected Process? SshfsProcess { get; private set; }
@@ -62,6 +64,20 @@ public abstract class MounterBase(Config config) : IMounter
 
         ConfigureEnvironment(startInfo);
 
+        if (Config.TwoFactorPam)
+        {
+            // ssh re-invokes this executable for every prompt (see Askpass):
+            // the password prompt is answered from the environment; PAM
+            // challenges (e.g. CERN 2FA) surface as a dialog.
+            startInfo.EnvironmentVariables[Askpass.ModeVariable] = "1";
+            startInfo.EnvironmentVariables[Askpass.PasswordVariable] = password;
+            startInfo.EnvironmentVariables["SSH_ASKPASS"] = AskpassExecutablePath();
+            startInfo.EnvironmentVariables["SSH_ASKPASS_REQUIRE"] = "force";
+            // Older ssh only consults SSH_ASKPASS when DISPLAY is set.
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")))
+                startInfo.EnvironmentVariables["DISPLAY"] = ":0";
+        }
+
         Process process;
         try
         {
@@ -78,9 +94,12 @@ public abstract class MounterBase(Config config) : IMounter
         _stdout = process.StandardOutput.ReadToEndAsync();
         _stderr = process.StandardError.ReadToEndAsync();
 
-        // The password travels via stdin only.
-        await process.StandardInput.WriteLineAsync(password);
-        await process.StandardInput.FlushAsync();
+        if (!Config.TwoFactorPam)
+        {
+            // The password travels via stdin only.
+            await process.StandardInput.WriteLineAsync(password);
+            await process.StandardInput.FlushAsync();
+        }
         process.StandardInput.Close();
 
         var deadline = DateTime.UtcNow + MountTimeout;
@@ -160,8 +179,9 @@ public abstract class MounterBase(Config config) : IMounter
         $"{username}@{Config.Gateway}:{Config.RemotePath}",
         MountTarget,
         "-f",
-        "-o", "password_stdin",
-        "-o", "PreferredAuthentications=password",
+        .. Config.TwoFactorPam
+            ? new[] { "-o", "PreferredAuthentications=keyboard-interactive,password" }
+            : ["-o", "password_stdin", "-o", "PreferredAuthentications=password"],
         "-o", "PubkeyAuthentication=no",
         "-o", "NumberOfPasswordPrompts=1",
         "-o", "ConnectTimeout=10",
@@ -196,6 +216,14 @@ public abstract class MounterBase(Config config) : IMounter
         if (message.Length > 1800)
             message = "[Earlier output omitted]\n\n" + message[^1800..];
         return message;
+    }
+
+    private static string AskpassExecutablePath()
+    {
+        var path = Environment.ProcessPath
+            ?? throw new InvalidOperationException("Cannot determine the executable path for SSH_ASKPASS.");
+        // SSHFS-Win's cygwin ssh copes better with forward slashes.
+        return OperatingSystem.IsWindows() ? path.Replace('\\', '/') : path;
     }
 
     protected static string? FindOnPath(string name, params string[] extraDirectories)
