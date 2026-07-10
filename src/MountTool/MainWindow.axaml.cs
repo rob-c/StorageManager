@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Threading;
 using MountTool.Mounting;
 
 namespace MountTool;
@@ -33,6 +34,7 @@ public partial class MainWindow : Window
     private IMounter? _mounter;
     private bool _connected;
     private bool _closeApproved;
+    private readonly DispatcherTimer _watchdog;
 
     public MainWindow()
     {
@@ -70,6 +72,21 @@ public partial class MainWindow : Window
         };
 
         Closing += OnClosing;
+
+        _watchdog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _watchdog.Tick += OnWatchdogTick;
+    }
+
+    private async void OnWatchdogTick(object? sender, EventArgs e)
+    {
+        if (!_connected || _mounter is not { } mounter || mounter.IsMounted)
+            return;
+
+        _watchdog.Stop();
+        _connected = false;
+        _mounter = null;
+        await mounter.UnmountAsync();
+        SetDisconnectedUi("Connection was lost.", error: true);
     }
 
     private void InitializeRemoteOptions()
@@ -288,6 +305,7 @@ public partial class MainWindow : Window
         DisconnectButton.IsEnabled = false;
         StatusLabel.Text = status;
         StatusDot.Fill = LedBusy;
+        _watchdog.Stop();
     }
 
     private void SetConnectedUi(string username)
@@ -300,6 +318,7 @@ public partial class MainWindow : Window
         StatusLabel.Text = $"Connected as {username} on {_mounter.TargetDescription}";
         StatusDot.Fill = LedConnected;
         PasswordBox.Text = "";
+        _watchdog.Start();
     }
 
     private void SetDisconnectedUi(string status, bool error = false)
@@ -311,5 +330,6 @@ public partial class MainWindow : Window
         StatusLabel.Text = status;
         StatusDot.Fill = error ? LedError : LedIdle;
         PasswordBox.Text = "";
+        _watchdog.Stop();
     }
 }

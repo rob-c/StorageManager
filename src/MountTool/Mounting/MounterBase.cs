@@ -165,8 +165,9 @@ public abstract class MounterBase(Config config) : IMounter
         "-o", "PubkeyAuthentication=no",
         "-o", "NumberOfPasswordPrompts=1",
         "-o", "ConnectTimeout=10",
+        // No "-o reconnect": when the server goes away the ssh transport must
+        // exit (after ServerAlive gives up) so the watchdog can unmount cleanly.
         "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "reconnect",
         "-o", "ServerAliveInterval=30",
         "-o", "ServerAliveCountMax=3",
         .. ExtraSshfsArguments,
