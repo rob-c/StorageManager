@@ -188,7 +188,9 @@ public abstract class MounterBase(Config config) : IMounter
             ? new[] { "-o", "PreferredAuthentications=keyboard-interactive,password" }
             : ["-o", "password_stdin", "-o", "PreferredAuthentications=password"],
         "-o", "PubkeyAuthentication=no",
-        "-o", "NumberOfPasswordPrompts=1",
+        // 2FA needs multiple keyboard-interactive rounds (password, then the
+        // second factor), so it must allow more than one prompt.
+        "-o", $"NumberOfPasswordPrompts={(Config.TwoFactorPam ? 6 : 1)}",
         "-o", "ConnectTimeout=10",
         // No "-o reconnect": when the server goes away the ssh transport must
         // exit (after ServerAlive gives up) so the watchdog can unmount cleanly.
