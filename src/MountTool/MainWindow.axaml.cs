@@ -56,9 +56,10 @@ public partial class MainWindow : Window
             HostBox.Items.Add(new ComboBoxItem { Content = "Other…", IsEnabled = false });
             HostBox.SelectedIndex = 0;
 
-            InitializeRemoteOptions();
+            RebuildRemoteOptions();
             InitializeMountTarget();
             UsernameBox.TextChanged += (_, _) => RefreshRemoteOptionTexts();
+            HostBox.SelectionChanged += (_, _) => RebuildRemoteOptions();
         }
 
         Opened += async (_, _) =>
@@ -90,24 +91,43 @@ public partial class MainWindow : Window
         SetDisconnectedUi("Connection was lost.", error: true);
     }
 
-    private void InitializeRemoteOptions()
-    {
-        _remoteTemplates.AddRange(RemotePathTemplates);
+    private HostEntry SelectedHost =>
+        _baseConfig!.HostList.FirstOrDefault(h => h.Name == HostBox.SelectedItem as string)
+            ?? _baseConfig.HostList[0];
 
-        // A remotePath from mount-config.json outside the standard list becomes
-        // an extra option and the default selection.
-        var configured = _baseConfig!.RemotePath;
-        if (!string.IsNullOrWhiteSpace(configured) && !_remoteTemplates.Contains(configured))
-            _remoteTemplates.Add(configured);
+    private void RebuildRemoteOptions()
+    {
+        _remoteTemplates.Clear();
+        RemoteBox.Items.Clear();
+
+        if (SelectedHost.RemotePaths is { Count: > 0 } hostPaths)
+        {
+            _remoteTemplates.AddRange(hostPaths);
+        }
+        else
+        {
+            _remoteTemplates.AddRange(RemotePathTemplates);
+
+            // A remotePath from mount-config.json outside the standard list
+            // becomes an extra option and the default selection.
+            var configured = _baseConfig!.RemotePath;
+            if (!string.IsNullOrWhiteSpace(configured) && !_remoteTemplates.Contains(configured))
+                _remoteTemplates.Add(configured);
+        }
 
         foreach (var template in _remoteTemplates)
             RemoteBox.Items.Add(template);
 
         RemoteBox.Items.Add(new ComboBoxItem { Content = "Other…", IsEnabled = false });
 
-        var defaultIndex = _remoteTemplates.IndexOf(configured);
-        RemoteBox.SelectedIndex = defaultIndex >= 0 ? defaultIndex : _remoteTemplates.Count - 1;
+        var defaultIndex = _remoteTemplates.IndexOf(_baseConfig!.RemotePath);
+        RemoteBox.SelectedIndex = defaultIndex >= 0 ? defaultIndex : 0;
+        RefreshRemoteOptionTexts();
     }
+
+    private static string SubstituteUser(string template, string username) =>
+        username.Length == 0 ? template
+            : template.Replace($"{UserToken}1", username[..1]).Replace(UserToken, username);
 
     private void InitializeMountTarget()
     {
@@ -147,9 +167,7 @@ public partial class MainWindow : Window
 
         for (var i = 0; i < _remoteTemplates.Count; i++)
         {
-            var display = username.Length == 0
-                ? _remoteTemplates[i]
-                : _remoteTemplates[i].Replace(UserToken, username);
+            var display = SubstituteUser(_remoteTemplates[i], username);
             if (!display.Equals(RemoteBox.Items[i]))
                 RemoteBox.Items[i] = display;
         }
@@ -186,8 +204,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var remotePath = _remoteTemplates[Math.Max(0, RemoteBox.SelectedIndex)]
-            .Replace(UserToken, username);
+        var remotePath = SubstituteUser(_remoteTemplates[Math.Max(0, RemoteBox.SelectedIndex)], username);
 
         var target = IsWindows
             ? DriveBox.SelectedItem as string
@@ -200,8 +217,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var host = _baseConfig.HostList.FirstOrDefault(h => h.Name == HostBox.SelectedItem as string)
-            ?? _baseConfig.HostList[0];
+        var host = SelectedHost;
         var mounter = CreateMounter(_baseConfig with
         {
             Gateway = host.Name,

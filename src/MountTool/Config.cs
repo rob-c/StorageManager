@@ -2,7 +2,9 @@ using System.Text.Json;
 
 namespace MountTool;
 
-public sealed record HostEntry(string Name, bool TwoFactorPam);
+/// <summary>RemotePaths overrides the default folder options for this host;
+/// templates may use $USER (username) and $USER1 (its first letter).</summary>
+public sealed record HostEntry(string Name, bool TwoFactorPam, IReadOnlyList<string>? RemotePaths = null);
 
 public sealed record Config(
     string? Gateway,
@@ -23,7 +25,8 @@ public sealed record Config(
             new("staff.ph.ed.ac.uk", TwoFactorPam: false),
             new("phcomputeppe01.ph.ed.ac.uk", TwoFactorPam: false),
             new("t3-mw2.ph.ed.ac.uk", TwoFactorPam: false),
-            new("lxplus.cern.ch", TwoFactorPam: true),
+            new("lxplus.cern.ch", TwoFactorPam: true, RemotePaths:
+                ["/afs/cern.ch/user/$USER1/$USER", "/eos/user/$USER1/$USER"]),
         ]);
 
     /// <summary>Selectable hosts; a legacy config with only "gateway" yields a single entry.</summary>
