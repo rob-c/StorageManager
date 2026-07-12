@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using MountTool.Errors;
 
 namespace MountTool.Mounting;
 
@@ -33,16 +34,20 @@ public sealed class WindowsMounter(Config config) : MounterBase(config)
         }
     }
 
-    public override string? Preflight()
+    public override PreflightResult? Preflight()
     {
         if (FindSshfs() is null)
-            return "SSHFS-Win was not found.\n\n" +
-                   "Install both (in this order):\n" +
-                   "1. WinFsp — https://winfsp.dev/rel/\n" +
-                   "2. SSHFS-Win — https://github.com/winfsp/sshfs-win/releases";
+            return new PreflightResult(
+                "SSHFS-Win was not found.\n\n" +
+                "It needs WinFsp and SSHFS-Win installed. Click \"Install for me\" to do this " +
+                "automatically, or install manually:\n" +
+                "1. WinFsp — https://winfsp.dev/rel/\n" +
+                "2. SSHFS-Win — https://github.com/winfsp/sshfs-win/releases",
+                new FixAction("Install for me", FixKindUi.WingetInstall,
+                    "WinFsp.WinFsp;SSHFS-Win.SSHFS-Win"));
 
         if (Environment.GetLogicalDrives().Contains(Drive + @"\"))
-            return $"{Drive} is already in use.";
+            return new PreflightResult($"{Drive} is already in use.");
 
         return null;
     }

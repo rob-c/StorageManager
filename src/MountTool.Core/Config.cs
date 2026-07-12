@@ -26,7 +26,16 @@ public sealed record Config(
             new("phcomputeppe01.ph.ed.ac.uk", TwoFactorPam: false),
             new("t3-mw2.ph.ed.ac.uk", TwoFactorPam: false),
             new("lxplus.cern.ch", TwoFactorPam: true, RemotePaths:
-                ["/afs/cern.ch/user/$USER1/$USER", "/eos/user/$USER1/$USER"]),
+            [
+                "/afs/cern.ch/user/$USER1/$USER",
+                "/afs/cern.ch/work/$USER1/$USER",
+                "/eos/user/$USER1/$USER",
+                "/eos/home-$USER1/$USER",
+                "/eos/experiment/atlas",
+                "/eos/experiment/cms",
+                "/eos/experiment/lhcb",
+                "/eos/experiment/alice",
+            ]),
         ]);
 
     /// <summary>Selectable hosts; a legacy config with only "gateway" yields a single entry.</summary>

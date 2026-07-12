@@ -7,6 +7,8 @@ public sealed class LinuxMounter(Config config) : UnixMounterBase(config)
         "  sudo apt install sshfs      (Debian/Ubuntu)\n" +
         "  sudo dnf install fuse-sshfs (Fedora/RHEL)";
 
+    protected override string? InstallCommand => "sudo apt install sshfs";
+
     protected override string? FindSshfs() => FindOnPath("sshfs", "/usr/bin", "/usr/local/bin");
 
     protected override bool IsMountPoint()

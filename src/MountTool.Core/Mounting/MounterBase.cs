@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using MountTool.Errors;
 
 namespace MountTool.Mounting;
 
@@ -20,7 +21,7 @@ public abstract class MounterBase(Config config) : IMounter
     public bool IsMounted =>
         SshfsProcess is { HasExited: false } && TargetPresent();
 
-    public abstract string? Preflight();
+    public abstract PreflightResult? Preflight();
     public abstract void OpenInFileManager();
 
     /// <summary>Full path to the sshfs executable, or null if not installed.</summary>
@@ -44,7 +45,7 @@ public abstract class MounterBase(Config config) : IMounter
     {
         var sshfs = FindSshfs();
         if (sshfs is null)
-            return Preflight() ?? "sshfs was not found.";
+            return Preflight()?.Message ?? "sshfs was not found.";
 
         PrepareTarget();
 
