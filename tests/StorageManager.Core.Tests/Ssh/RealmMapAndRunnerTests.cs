@@ -52,6 +52,14 @@ public sealed class FakeProcessRunner : IProcessRunner
         return this;
     }
 
+    /// <summary>Clears rules and recorded calls so a test can re-script mid-run.</summary>
+    public FakeProcessRunner Reset()
+    {
+        _rules.Clear();
+        Calls.Clear();
+        return this;
+    }
+
     public FakeProcessRunner On(Func<string, IReadOnlyList<string>, bool> match, Func<ProcessResult> result)
     {
         _rules.Add((match, result));
