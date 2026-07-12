@@ -51,7 +51,9 @@ internal static class Program
             LaunchMode.Diagnostics => PrintDiagnostics(),
             LaunchMode.Tui => TerminalApp.Run(),
             LaunchMode.Help => PrintHelp(),
-            _ => RunGui(args),
+            // Auto-resolved GUI falls back to the terminal UI if the display can't
+            // be opened (e.g. a stale DISPLAY on WSL/headless); an explicit --gui does not.
+            _ => RunGui(args, allowTuiFallback: !args.Contains("--gui")),
         };
     }
 
@@ -79,13 +81,21 @@ internal static class Program
         return hasDisplay ? LaunchMode.Gui : LaunchMode.Tui;
     }
 
-    private static int RunGui(string[] args)
+    private static int RunGui(string[] args, bool allowTuiFallback = false)
     {
-        AppBuilder.Configure<App>()
-            .UsePlatformDetect()
-            .WithInterFont()
-            .StartWithClassicDesktopLifetime(args);
-        return 0;
+        try
+        {
+            AppBuilder.Configure<App>()
+                .UsePlatformDetect()
+                .WithInterFont()
+                .StartWithClassicDesktopLifetime(args);
+            return 0;
+        }
+        catch (Exception ex) when (allowTuiFallback)
+        {
+            Console.Error.WriteLine($"Graphical interface unavailable ({ex.Message}); using the terminal interface.");
+            return TerminalApp.Run();
+        }
     }
 
     private static int PrintDiagnostics()

@@ -60,6 +60,10 @@
               Content="Allow read-write access (writable)"
               ToolTip.Tip="Off by default for safety: the mount is read-only so files can't be changed or deleted by accident. Tick this to enable writing." />
 
+    <CheckBox x:Name="KerberosCheck" Margin="0,2,0,0"
+              Content="Use Kerberos sign-in (jump hosts)"
+              ToolTip.Tip="Off by default: jump-host connections use your password on both hops. Tick this to sign in with Kerberos (kinit + GSSAPI delegation) instead, which also enables automatic reconnect." />
+
     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,14,0,0">
       <Ellipse x:Name="StatusDot" Width="9" Height="9" VerticalAlignment="Center"
                Fill="{DynamicResource TextFillColorTertiaryBrush}" />

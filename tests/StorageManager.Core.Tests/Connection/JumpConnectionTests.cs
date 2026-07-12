@@ -41,7 +41,8 @@ public class JumpConnectionTests : IDisposable
     private readonly JumpRequest _req = new(
         TargetHost: "cplab175.ph.ed.ac.uk", TargetUser: "rcurrie4",
         RemotePath: "/home/rcurrie4", MountTarget: "/home/me/S",
-        JumpHost: "student.ph.ed.ac.uk", JumpUser: "rcurrie4", Password: "pw");
+        JumpHost: "student.ph.ed.ac.uk", JumpUser: "rcurrie4", Password: "pw",
+        UseKerberos: true);
 
     private JumpConnection Build(KCli cli, FakeProcessRunner runner)
     {
@@ -137,6 +138,24 @@ public class JumpConnectionTests : IDisposable
         Assert.Equal(1, mount.Mounts);
         // The master was torn down after the mount failed (an -O exit call was issued).
         Assert.Contains(runner.Calls, c => c.Args.Contains("exit"));
+    }
+
+    [Fact]
+    public async Task Default_password_path_skips_kinit_and_omits_batchmode()
+    {
+        var cli = new KCli();
+        var runner = new FakeProcessRunner().On((f, a) => true, new ProcessResult(0, "", ""));
+        var mount = new FakeMount();
+        var req = _req with { UseKerberos = false };
+
+        var outcome = await Build(cli, runner).ConnectAsync(req, mount);
+
+        Assert.True(outcome.Success);
+        Assert.False(outcome.UsedKerberos);
+        Assert.False(cli.Valid);            // kinit was never called
+        Assert.Equal(1, mount.Mounts);
+        // Password mode: the master is established WITHOUT BatchMode so askpass can answer.
+        Assert.DoesNotContain(runner.Calls, c => c.Args.Contains("BatchMode=yes"));
     }
 
     [Fact]

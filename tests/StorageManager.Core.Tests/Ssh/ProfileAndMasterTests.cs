@@ -120,6 +120,16 @@ public class ControlMasterTests
     }
 
     [Fact]
+    public async Task Establish_without_batchmode_omits_the_flag()
+    {
+        var runner = new FakeProcessRunner();
+        await new ControlMaster(runner).EstablishAsync("h", batchMode: false);
+        var (_, args, _) = runner.Calls.Single();
+        Assert.DoesNotContain("BatchMode=yes", args);
+        Assert.Contains("-M", args);
+    }
+
+    [Fact]
     public async Task Exit_issues_O_exit()
     {
         var runner = new FakeProcessRunner();

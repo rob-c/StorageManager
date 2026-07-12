@@ -15,13 +15,25 @@ public sealed class ControlMaster(IProcessRunner runner)
     /// Starts the master: <c>ssh -M -N -f -o BatchMode=yes &lt;target&gt;</c>. With a valid
     /// Kerberos ticket this authenticates non-interactively via GSSAPI through the jump.
     /// </summary>
+    /// <summary>
+    /// Starts the master: <c>ssh -M -N -f &lt;target&gt;</c>. With <paramref name="batchMode"/>
+    /// (the Kerberos path) it adds <c>BatchMode=yes</c> for non-interactive GSSAPI; with
+    /// batch mode off (the password path) it lets SSH_ASKPASS in <paramref name="environment"/>
+    /// answer the jump and target password prompts.
+    /// </summary>
     public Task<ProcessResult> EstablishAsync(
         string target,
         string? configPath = null,
         IReadOnlyDictionary<string, string>? environment = null,
+        bool batchMode = true,
         CancellationToken ct = default)
     {
-        var args = new List<string> { "-M", "-N", "-f", "-o", "BatchMode=yes" };
+        var args = new List<string> { "-M", "-N", "-f" };
+        if (batchMode)
+        {
+            args.Add("-o");
+            args.Add("BatchMode=yes");
+        }
         AddConfig(args, configPath);
         args.Add(target);
         return runner.RunAsync("ssh", args, stdin: null, environment, EstablishTimeout, ct);

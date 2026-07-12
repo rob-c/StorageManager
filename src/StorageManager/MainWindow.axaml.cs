@@ -52,7 +52,7 @@ public partial class MainWindow : Window
     private bool _connectedReadOnly = true;
     private JumpConnector? _jumpConnector;
     private bool _jumpTicking;
-    private (HostEntry Host, string Jump, string User, string RemotePath, string Target, bool ReadOnly)? _jumpReconnect;
+    private (HostEntry Host, string Jump, string User, string RemotePath, string Target, bool ReadOnly, bool UseKerberos)? _jumpReconnect;
 
     private const string NoJump = "(no jump host)";
 
@@ -112,6 +112,7 @@ public partial class MainWindow : Window
         {
             JumpLabel.IsVisible = false;
             JumpBox.IsVisible = false;
+            KerberosCheck.IsVisible = false;
         }
         else if (_baseConfig is not null)
         {
@@ -437,7 +438,8 @@ public partial class MainWindow : Window
 
         if (SelectedJumpHost() is { } jump)
         {
-            await ConnectViaJump(host, jump, username, remotePath, target, readOnly, password);
+            var useKerberos = KerberosCheck.IsChecked == true;
+            await ConnectViaJump(host, jump, username, remotePath, target, readOnly, useKerberos, password);
             return;
         }
 
@@ -453,7 +455,8 @@ public partial class MainWindow : Window
     }
 
     private async Task ConnectViaJump(
-        HostEntry host, string jump, string user, string remotePath, string target, bool readOnly, string password)
+        HostEntry host, string jump, string user, string remotePath, string target,
+        bool readOnly, bool useKerberos, string password)
     {
         var connector = new JumpConnector(_baseConfig!);
         if (connector.KerberosPreflight() is { } problem)
@@ -474,7 +477,8 @@ public partial class MainWindow : Window
         }
 
         SetBusyUi($"Connecting to {host.Name} via {jump}…");
-        var outcome = await connector.ConnectAsync(host.Name, user, remotePath, target, jump, password, readOnly);
+        var outcome = await connector.ConnectAsync(
+            host.Name, user, remotePath, target, jump, password, useKerberos, readOnly);
 
         if (!outcome.Success)
         {
@@ -490,7 +494,7 @@ public partial class MainWindow : Window
         _connectedUser = user;
         _connectedTarget = target;
         _connectedReadOnly = readOnly;
-        _jumpReconnect = (host, jump, user, remotePath, target, readOnly);
+        _jumpReconnect = (host, jump, user, remotePath, target, readOnly, useKerberos);
         _reconnect = null;
 
         _saved = _saved with { Username = user, HostName = host.Name, MountTarget = target };
@@ -651,7 +655,7 @@ public partial class MainWindow : Window
         if (_jumpReconnect is { } jr)
         {
             ReconnectButton.IsVisible = false;
-            await ConnectViaJump(jr.Host, jr.Jump, jr.User, jr.RemotePath, jr.Target, jr.ReadOnly, password);
+            await ConnectViaJump(jr.Host, jr.Jump, jr.User, jr.RemotePath, jr.Target, jr.ReadOnly, jr.UseKerberos, password);
             return;
         }
 
@@ -815,6 +819,7 @@ public partial class MainWindow : Window
         DriveBox.IsEnabled = enabled;
         JumpBox.IsEnabled = enabled;
         ReadWriteCheck.IsEnabled = enabled;
+        KerberosCheck.IsEnabled = enabled;
     }
 
     private void SetBusyUi(string status)

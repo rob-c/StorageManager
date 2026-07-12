@@ -223,11 +223,12 @@ public static class TerminalApp
         var user = AnsiConsole.Prompt(new TextPrompt<string>("[green]Username[/]:").DefaultValue(Environment.UserName));
         var mount = AnsiConsole.Prompt(new TextPrompt<string>("Mount [green]location[/]:")
             .DefaultValue(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "S-remote")));
+        var useKerberos = AnsiConsole.Confirm("Use [yellow]Kerberos[/] sign-in? (default is your password on both hops)", false);
         var password = AnsiConsole.Prompt(new TextPrompt<string>("[green]Password[/]:").Secret());
 
         StorageManager.Connection.JumpConnectOutcome outcome = default!;
         AnsiConsole.Status().Start($"Connecting through {jump}…", _ =>
-            outcome = connector.ConnectAsync(target, user, ".", mount, jump, password).GetAwaiter().GetResult());
+            outcome = connector.ConnectAsync(target, user, ".", mount, jump, password, useKerberos).GetAwaiter().GetResult());
 
         if (!outcome.Success)
         {

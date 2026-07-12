@@ -12,7 +12,8 @@ public sealed record JumpRequest(
     string MountTarget,
     string JumpHost,
     string JumpUser,
-    string Password);
+    string Password,
+    bool UseKerberos = false);
 
 /// <summary>An established jump connection the caller drives (poll <see cref="Monitor"/> on a timer).</summary>
 public sealed record JumpSession(
@@ -63,26 +64,32 @@ public sealed class JumpConnection(
                 "The host or username contains characters that aren't allowed. " +
                 "Use plain host names and usernames.", false);
 
-        // 1. Kerberos (primary). No realm/tools → password fallback handled by the mount itself.
+        // 1. Auth. Kerberos only when the user opted in AND a realm/tools exist; otherwise
+        //    password on both hops (answered non-interactively by the askpass environment).
         var usedKerberos = false;
-        var realm = realmMap.RealmFor(req.TargetHost);
-        if (realm is not null && kerberos.Status().ToolsAvailable)
+        if (req.UseKerberos)
         {
-            var after = kerberos.Authenticate(
-                $"{req.TargetUser}@{realm}", req.Password,
-                alsoAklog: true, forwardable: true, addressless: true);
-            if (!after.HasValidTicket)
-                return new JumpConnectOutcome(null,
-                    "Kerberos sign-in failed. Check your username and password, then try again.", false);
-            usedKerberos = true;
+            var realm = realmMap.RealmFor(req.TargetHost);
+            if (realm is not null && kerberos.Status().ToolsAvailable)
+            {
+                var after = kerberos.Authenticate(
+                    $"{req.TargetUser}@{realm}", req.Password,
+                    alsoAklog: true, forwardable: true, addressless: true);
+                if (!after.HasValidTicket)
+                    return new JumpConnectOutcome(null,
+                        "Kerberos sign-in failed. Check your username and password, then try again.", false);
+                usedKerberos = true;
+            }
         }
 
         // 2. Write the ssh_config profile (target + jump blocks), backed up first.
         profileWriter.Apply(sshConfigPath,
             new JumpProfile(req.TargetHost, req.TargetUser, req.JumpHost, req.JumpUser));
 
-        // 3. Bring up the shared master through the jump.
-        var established = await master.EstablishAsync(req.TargetHost, sshConfigPath, sshEnvironment, ct);
+        // 3. Bring up the shared master through the jump. Kerberos → non-interactive
+        //    (BatchMode); password → let SSH_ASKPASS answer the prompts.
+        var batchMode = usedKerberos;
+        var established = await master.EstablishAsync(req.TargetHost, sshConfigPath, sshEnvironment, batchMode, ct);
         if (!established.Ok)
         {
             var friendly = ErrorTranslator.Translate(established.Stderr, established.ExitCode, twoFactor: false);
@@ -111,10 +118,12 @@ public sealed class JumpConnection(
             },
             reconnect: async c =>
             {
-                var r = await master.EstablishAsync(req.TargetHost, sshConfigPath, sshEnvironment, c);
+                var r = await master.EstablishAsync(req.TargetHost, sshConfigPath, sshEnvironment, batchMode, c);
                 return r.Ok && await mount.MountAsync(c) is null;
             },
-            hasValidTicket: () => kerberos.Status().HasValidTicket,
+            // Auto-reconnect relies on the Kerberos ticket; the password path
+            // requires a manual reconnect (we don't keep the password around).
+            hasValidTicket: usedKerberos ? () => kerberos.Status().HasValidTicket : () => false,
             clock: clock,
             options: monitorOptions);
 

@@ -31,14 +31,18 @@ public sealed class JumpConnector
 
     public async Task<JumpConnectOutcome> ConnectAsync(
         string targetHost, string user, string remotePath, string mountTarget,
-        string jumpHost, string password, bool readOnly = true, CancellationToken ct = default)
+        string jumpHost, string password, bool useKerberos, bool readOnly = true, CancellationToken ct = default)
     {
         var runner = SystemProcessRunner.Instance;
         _configPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh", "config");
         _target = targetHost;
         _master = new ControlMaster(runner);
-        _mount = new SshfsJumpMount(runner, targetHost, user, remotePath, mountTarget, readOnly);
+
+        // Password mode answers ssh's prompts via SSH_ASKPASS; Kerberos mode inherits
+        // the ambient environment (including KRB5CCNAME on Windows).
+        var env = useKerberos ? null : AskpassEnvironment.ForPassword(password);
+        _mount = new SshfsJumpMount(runner, targetHost, user, remotePath, mountTarget, readOnly, env);
 
         var connection = new JumpConnection(
             _config.BuildRealmMap(),
@@ -46,9 +50,10 @@ public sealed class JumpConnector
             new SshProfileWriter(),
             _master,
             _configPath,
-            () => DateTime.UtcNow);
+            () => DateTime.UtcNow,
+            sshEnvironment: env);
 
-        var request = new JumpRequest(targetHost, user, remotePath, mountTarget, jumpHost, user, password);
+        var request = new JumpRequest(targetHost, user, remotePath, mountTarget, jumpHost, user, password, useKerberos);
         var outcome = await connection.ConnectAsync(request, _mount, ct);
         Session = outcome.Session;
         return outcome;
