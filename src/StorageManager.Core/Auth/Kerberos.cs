@@ -26,8 +26,12 @@ public interface IKerberosCli
     /// <summary>Raw `klist` output, or null if unavailable.</summary>
     string? GetKlistOutput();
 
-    /// <summary>Runs kinit for the principal, feeding the password; best-effort.</summary>
-    bool Kinit(string principal, string password);
+    /// <summary>Runs kinit for the principal, feeding the password; best-effort.
+    /// When <paramref name="forwardable"/>, requests a forwardable TGT (kinit -f) so
+    /// GSSAPIDelegateCredentials can carry the ticket through a jump host. When
+    /// <paramref name="addressless"/>, requests an addressless TGT (kinit -A) that
+    /// survives NAT/firewall traversal for off-site clients.</summary>
+    bool Kinit(string principal, string password, bool forwardable = false, bool addressless = false);
 
     /// <summary>Obtains an AFS token from the current ticket.</summary>
     bool Aklog();
@@ -96,12 +100,14 @@ public sealed class KerberosHelper(IKerberosCli cli)
     /// check <see cref="KerberosStatus.HasValidTicket"/> rather than trusting kinit's
     /// exit code, so a failed password never looks like success.
     /// </summary>
-    public KerberosStatus Authenticate(string principal, string password, bool alsoAklog = true)
+    public KerberosStatus Authenticate(
+        string principal, string password,
+        bool alsoAklog = true, bool forwardable = false, bool addressless = false)
     {
         if (!cli.ToolsAvailable)
             return KerberosStatus.NoTools;
 
-        cli.Kinit(principal, password);
+        cli.Kinit(principal, password, forwardable, addressless);
         if (alsoAklog && cli.HasValidTicket() && cli.HasAklog)
             cli.Aklog();
 

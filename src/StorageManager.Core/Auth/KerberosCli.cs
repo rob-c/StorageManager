@@ -31,7 +31,7 @@ public sealed class KerberosCli : IKerberosCli
 
     public string? GetKlistOutput() => _klist is null ? null : RunOutput(_klist);
 
-    public bool Kinit(string principal, string password)
+    public bool Kinit(string principal, string password, bool forwardable = false, bool addressless = false)
     {
         if (_kinit is null)
             return false;
@@ -44,6 +44,10 @@ public sealed class KerberosCli : IKerberosCli
                 RedirectStandardInput = true,
                 RedirectStandardError = true,
             };
+            if (forwardable)
+                info.ArgumentList.Add("-f");
+            if (addressless)
+                info.ArgumentList.Add("-A");
             info.ArgumentList.Add(principal);
             using var p = Process.Start(info);
             if (p is null)

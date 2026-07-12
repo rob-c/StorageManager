@@ -37,6 +37,16 @@ public sealed record Config(
                 "/eos/experiment/lhcb",
                 "/eos/experiment/alice",
             ]),
+            // Fermilab: direct Kerberos (GSSAPI) to a per-experiment GPVM login node.
+            // Swap the experiment (dune) in the host/paths for others (sbnd, icarus, …).
+            new("dunegpvm01.fnal.gov", TwoFactorPam: false, RemotePaths:
+            [
+                "/nashome/$USER1/$USER",
+                "/exp/dune/app/users/$USER",
+                "/exp/dune/data/users/$USER",
+                "/pnfs/dune/scratch/users/$USER",
+                "/pnfs/dune/persistent/users/$USER",
+            ]),
         ]);
 
     /// <summary>Selectable hosts; a legacy config with only "gateway" yields a single entry.</summary>
