@@ -29,7 +29,7 @@ public partial class MainWindow : Window
         $"/home/{UserToken}",
         $"/storage/datastore-personal/{UserToken}",
         "/storage/datastore-group/PPE",
-        "/scratch",
+        "/localdisk",
     ];
 
     private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
@@ -116,6 +116,7 @@ public partial class MainWindow : Window
             foreach (var j in _baseConfig.JumpHostList)
                 JumpBox.Items.Add(j);
             JumpBox.SelectedIndex = 0;
+            ApplyDefaultJumpForHost();
         }
 
         // The single app-wide Kerberos switch: restored from settings, persisted on
@@ -317,6 +318,25 @@ public partial class MainWindow : Window
             _suppressOtherHandler = false;
         }
         RefreshRemoteOptionTexts();
+        ApplyDefaultJumpForHost();
+    }
+
+    // An internal Physics host (*.ph.ed.ac.uk) that isn't itself a gateway can only be
+    // reached through one, so default the jump host to student for those; anything else
+    // (staff/student themselves, lxplus, Fermilab, custom) defaults to no jump.
+    private void ApplyDefaultJumpForHost()
+    {
+        if (JumpBox.Items.Count == 0)
+            return;
+
+        var host = SelectedHost.Name;
+        var needsGateway = host.EndsWith(".ph.ed.ac.uk", StringComparison.OrdinalIgnoreCase)
+            && !host.Equals("student.ph.ed.ac.uk", StringComparison.OrdinalIgnoreCase)
+            && !host.Equals("staff.ph.ed.ac.uk", StringComparison.OrdinalIgnoreCase);
+
+        var target = needsGateway ? "student.ph.ed.ac.uk" : NoJump;
+        var idx = JumpBox.Items.IndexOf(target);
+        JumpBox.SelectedIndex = idx >= 0 ? idx : 0;
     }
 
     private static string SubstituteUser(string template, string username) =>
