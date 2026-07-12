@@ -251,6 +251,21 @@
     font-size: 13px; color: var(--text-mut); display: flex; flex-wrap: wrap; gap: 8px 20px; }
   .foot-meta a { color: var(--text-dim); }
 
+  /* ---------- screenshot gallery ---------- */
+  .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+  @media (max-width: 760px) { .gallery { grid-template-columns: 1fr; } }
+  .frame {
+    background: var(--ground-2); border: 1px solid var(--line); border-radius: 12px;
+    overflow: hidden; box-shadow: 0 20px 50px -34px #000; margin: 0;
+    transition: transform .14s ease, border-color .15s;
+  }
+  .frame:hover { transform: translateY(-3px); border-color: #33404e; }
+  .frame .fbar { display: flex; align-items: center; gap: 7px; padding: 9px 12px; border-bottom: 1px solid var(--line); background: #14181f; }
+  .frame .fbar i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .frame .fbar .fl { margin-left: 8px; font-family: var(--mono); font-size: 11.5px; color: var(--text-mut); }
+  .frame img { display: block; width: 100%; height: auto; background: var(--ground); }
+  .frame figcaption { padding: 13px 16px; font-size: 13.5px; color: var(--text-dim); }
+
   a.focusable:focus-visible, .btn:focus-visible, .grab:focus-visible {
     outline: 2px solid var(--teal); outline-offset: 3px; border-radius: 6px;
   }
@@ -271,6 +286,7 @@
     <nav class="nav-links">
       <a href="#features">Features</a>
       <a href="#how">How it works</a>
+      <a href="#screens">Screenshots</a>
       <a href="#download">Download</a>
       <a class="ghost focusable" href="https://github.com/rob-c/StorageManager">GitHub ↗</a>
     </nav>
@@ -426,6 +442,38 @@
 
 <span class="c-teal">Applied 2 fixes.</span> Backup: ~/.ssh/config.bak-20260712
 </pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="screens">
+    <div class="wrap">
+      <div class="sec-head" style="max-width:48ch">
+        <span class="eyebrow">See it in action</span>
+        <h2>The real app, on every screen.</h2>
+        <p>Not mock-ups — these are the actual windows, rendered straight from the app.</p>
+      </div>
+      <div class="gallery">
+        <figure class="frame">
+          <div class="fbar"><i style="background:#e05252"></i><i style="background:#ffb454"></i><i style="background:#2bc5a8"></i><span class="fl">Mount</span></div>
+          <img src="screenshots/main.png" alt="The Storage Manager mount window with username, host, folder and mount-location fields" loading="lazy">
+          <figcaption>Sign in, pick a folder, mount it — read-only by default, with a read-write toggle.</figcaption>
+        </figure>
+        <figure class="frame">
+          <div class="fbar"><i style="background:#e05252"></i><i style="background:#ffb454"></i><i style="background:#2bc5a8"></i><span class="fl">SSH Doctor</span></div>
+          <img src="screenshots/doctor.png" alt="The SSH Doctor listing a keepalive warning with a suggested fix" loading="lazy">
+          <figcaption>Audits your ssh_config and offers fixes you can preview as a diff before applying.</figcaption>
+        </figure>
+        <figure class="frame">
+          <div class="fbar"><i style="background:#e05252"></i><i style="background:#ffb454"></i><i style="background:#2bc5a8"></i><span class="fl">VS Code</span></div>
+          <img src="screenshots/vscode.png" alt="The VS Code setup window verifying the Remote-SSH configuration" loading="lazy">
+          <figcaption>Checks (and sets up) the Remote-SSH extension, ssh_config host block, and settings.</figcaption>
+        </figure>
+        <figure class="frame">
+          <div class="fbar"><i style="background:#e05252"></i><i style="background:#ffb454"></i><i style="background:#2bc5a8"></i><span class="fl">Status</span></div>
+          <img src="screenshots/status.png" alt="The Storage and Auth status window showing Kerberos ticket state and storage usage" loading="lazy">
+          <figcaption>Kerberos ticket state and AFS/EOS quota usage, consolidated in one view.</figcaption>
+        </figure>
       </div>
     </div>
   </section>

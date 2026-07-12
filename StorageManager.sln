@@ -13,6 +13,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{42EF66B9
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StorageManager.Core.Tests", "tests\StorageManager.Core.Tests\StorageManager.Core.Tests.csproj", "{C4B4E9F0-DF87-4AAE-BE62-7C2641152E22}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{08FCB7FF-26DD-4C1C-8FD1-2177CF884F82}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Screenshots", "tools\Screenshots\Screenshots.csproj", "{898A7DB5-A556-4692-AE00-2D815C3D14E0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -34,10 +38,15 @@ Global
 		{C4B4E9F0-DF87-4AAE-BE62-7C2641152E22}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C4B4E9F0-DF87-4AAE-BE62-7C2641152E22}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C4B4E9F0-DF87-4AAE-BE62-7C2641152E22}.Release|Any CPU.Build.0 = Release|Any CPU
+		{898A7DB5-A556-4692-AE00-2D815C3D14E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{898A7DB5-A556-4692-AE00-2D815C3D14E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{898A7DB5-A556-4692-AE00-2D815C3D14E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{898A7DB5-A556-4692-AE00-2D815C3D14E0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{E0BD4058-83BD-4B6C-BB5C-B1B78F9E3CB7} = {D52E997D-A991-479C-B75D-CDDA02E3F95E}
 		{DB9D023D-EE17-4BF3-88F2-9668ED4F3D1A} = {D52E997D-A991-479C-B75D-CDDA02E3F95E}
 		{C4B4E9F0-DF87-4AAE-BE62-7C2641152E22} = {42EF66B9-12E5-41F3-A0B7-E9F3696EA29B}
+		{898A7DB5-A556-4692-AE00-2D815C3D14E0} = {08FCB7FF-26DD-4C1C-8FD1-2177CF884F82}
 	EndGlobalSection
 EndGlobal

@@ -68,6 +68,19 @@ git tag v1.2.3 -m "Storage Manager v1.2.3"
 git push origin v1.2.3
 ```
 
+## Screenshots
+
+The screenshots in the README and on the website are generated, not captured by
+hand, so they stay current. `tools/Screenshots` renders the real Avalonia
+windows off-screen with the headless Skia backend:
+
+```bash
+dotnet run --project tools/Screenshots -c Release -- docs/screenshots
+```
+
+It writes `main.png`, `doctor.png`, `vscode.png`, and `status.png`. Re-run it
+after a UI change and commit the updated images.
+
 ## License
 
 Storage Manager is licensed under **GPL-3.0**. By contributing, you agree that
