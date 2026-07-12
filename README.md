@@ -50,6 +50,15 @@ appears in the app window, the TUI, `--help`, and the diagnostics bundle.
 
 ## Features
 
+- **Jump-host mounts with Kerberos** (Linux/macOS) — reach a final target through
+  a jump host (e.g. `cplab175.ph.ed.ac.uk` via `student`/`staff.ph.ed.ac.uk`, or
+  a Fermilab GPVM). Your password becomes a forwardable Kerberos ticket
+  (`kinit -f -A`) that's delegated user→jump→target; the tool writes the right
+  `~/.ssh/config` blocks and keeps a shared **ControlMaster** socket open so your
+  own `ssh` reuses it and reaches the target directly. A watchdog drops the mount
+  and socket if the link breaks for 15s and auto-reconnects while your ticket is
+  valid. On Windows, one-click MIT Kerberos install enables the ticket/Status
+  features (jump mounts are Linux/macOS for now).
 - **Mounts read-only by default for safety** — files can't be changed or deleted
   by accident. Tick "Allow read-write access" (GUI) or answer the read-write
   prompt (TUI) to enable writing; the connected status line shows the mode.

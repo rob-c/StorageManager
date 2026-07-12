@@ -98,6 +98,10 @@ public partial class MainWindow : Window
 
         SupportLabel.Text = Support.Line;
 
+        // Jump-host mounts ride the Unix ssh/ControlMaster/sshfs stack; on Windows,
+        // MIT Kerberos install and the Status view still work, but not jump mounts.
+        JumpButton.IsVisible = !IsWindows;
+
         _watchdog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _watchdog.Tick += OnWatchdogTick;
     }
@@ -506,6 +510,9 @@ public partial class MainWindow : Window
 
     private void OnOpenStatus(object? sender, RoutedEventArgs e) =>
         new StatusWindow(SelectedHost.Name, UsernameBox.Text?.Trim()).ShowDialog(this);
+
+    private void OnOpenJump(object? sender, RoutedEventArgs e) =>
+        new JumpConnectWindow(_baseConfig ?? Config.Default).ShowDialog(this);
 
     private void OnNewConnection(object? sender, RoutedEventArgs e) =>
         new MainWindow().Show();

@@ -125,6 +125,21 @@ public class JumpConnectionTests : IDisposable
     }
 
     [Fact]
+    public async Task Mount_failure_drops_master_and_reports()
+    {
+        var cli = new KCli();
+        var runner = new FakeProcessRunner().On((f, a) => true, new ProcessResult(0, "", "")); // master ok
+        var mount = new FakeMount { MountError = "reading remote directory: No such file or directory" };
+
+        var outcome = await Build(cli, runner).ConnectAsync(_req, mount);
+
+        Assert.False(outcome.Success);
+        Assert.Equal(1, mount.Mounts);
+        // The master was torn down after the mount failed (an -O exit call was issued).
+        Assert.Contains(runner.Calls, c => c.Args.Contains("exit"));
+    }
+
+    [Fact]
     public async Task No_realm_uses_password_fallback_without_kerberos()
     {
         var cli = new KCli { ToolsAvailable = true };

@@ -28,12 +28,13 @@ public static class TerminalApp
         {
             var choice = AnsiConsole.Prompt(new SelectionPrompt<string>()
                 .Title("What would you like to do?")
-                .AddChoices("Connect storage", "Storage & Auth status", "SSH Doctor",
-                            "VS Code remote setup", "Diagnostics", "Quit"));
+                .AddChoices("Connect storage", "Connect via jump host", "Storage & Auth status",
+                            "SSH Doctor", "VS Code remote setup", "Diagnostics", "Quit"));
 
             switch (choice)
             {
                 case "Connect storage": Connect(); break;
+                case "Connect via jump host": ConnectJump(); break;
                 case "Storage & Auth status": RunStatus(); break;
                 case "SSH Doctor": RunDoctor(); break;
                 case "VS Code remote setup": RunVsCode(); break;
@@ -199,6 +200,54 @@ public static class TerminalApp
             var outcome = new ConfigFixer().Apply(configPath, fixes, dryRun: false);
             AnsiConsole.MarkupLineInterpolated(
                 $"[green]Applied.[/] Backup: {outcome.BackupPath ?? "(none)"}");
+        }
+    }
+
+    private static void ConnectJump()
+    {
+        Config config;
+        try { config = Config.Load(); }
+        catch (Exception ex) { AnsiConsole.MarkupLineInterpolated($"[red]{ex.Message}[/]"); return; }
+
+        var connector = new StorageManager.Gui.JumpConnector(config);
+        if (connector.KerberosPreflight() is { } problem)
+        {
+            AnsiConsole.MarkupLineInterpolated($"[red]{problem.Message}[/]");
+            if (problem.Fix is { Kind: StorageManager.Errors.FixKindUi.CopyCommand } fix)
+                AnsiConsole.MarkupLineInterpolated($"[yellow]Run:[/] {fix.Payload}");
+            return;
+        }
+
+        var target = AnsiConsole.Prompt(new TextPrompt<string>("Final [green]target[/]:").DefaultValue("cplab175.ph.ed.ac.uk"));
+        var jump = AnsiConsole.Prompt(new SelectionPrompt<string>().Title("Jump [green]host[/]").AddChoices(config.JumpHostList));
+        var user = AnsiConsole.Prompt(new TextPrompt<string>("[green]Username[/]:").DefaultValue(Environment.UserName));
+        var mount = AnsiConsole.Prompt(new TextPrompt<string>("Mount [green]location[/]:")
+            .DefaultValue(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "S-remote")));
+        var password = AnsiConsole.Prompt(new TextPrompt<string>("[green]Password[/]:").Secret());
+
+        StorageManager.Connection.JumpConnectOutcome outcome = default!;
+        AnsiConsole.Status().Start($"Connecting through {jump}…", _ =>
+            outcome = connector.ConnectAsync(target, user, ".", mount, jump, password).GetAwaiter().GetResult());
+
+        if (!outcome.Success)
+        {
+            AnsiConsole.MarkupLineInterpolated($"[red]{outcome.Error}[/]");
+            return;
+        }
+
+        var authKind = outcome.UsedKerberos ? "Kerberos" : "password";
+        AnsiConsole.MarkupLineInterpolated(
+            $"[green]Connected[/] as {user} on {mount} ({authKind}). The SSH socket stays open — your own ssh reuses it.");
+
+        if (AnsiConsole.Confirm("Disconnect now (drop mount + socket)?", false))
+        {
+            connector.DisconnectAsync().GetAwaiter().GetResult();
+            AnsiConsole.MarkupLine("[grey]Disconnected.[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("[grey]Left connected. The watchdog runs while the app is open; " +
+                                   "closing the terminal leaves the persistent socket per ControlPersist.[/]");
         }
     }
 

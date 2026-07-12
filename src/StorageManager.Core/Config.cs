@@ -14,9 +14,21 @@ public sealed record Config(
     bool TwoFactorPam = false,
     int KeepAliveIntervalSeconds = 5,
     int KeepAliveCountMax = 3,
-    bool ReadOnly = true)
+    bool ReadOnly = true,
+    IReadOnlyList<string>? JumpHosts = null,
+    IReadOnlyDictionary<string, string>? KerberosRealms = null)
 {
     public const string FileName = "mount-config.json";
+
+    private static readonly string[] DefaultJumpHosts =
+        ["student.ph.ed.ac.uk", "staff.ph.ed.ac.uk"];
+
+    /// <summary>Jump-host options offered in the UI (Edinburgh gateways by default).</summary>
+    public IReadOnlyList<string> JumpHostList =>
+        JumpHosts is { Count: > 0 } ? JumpHosts : DefaultJumpHosts;
+
+    /// <summary>A realm map with any user-supplied domain→realm overrides folded in.</summary>
+    public Auth.RealmMap BuildRealmMap() => new(KerberosRealms);
 
     public static Config Default { get; } = new(
         null,

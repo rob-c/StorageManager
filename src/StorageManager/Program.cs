@@ -38,6 +38,10 @@ internal static class Program
             return Askpass.Run(args.FirstOrDefault() ?? "");
         }
 
+        // On Windows, point MIT Kerberos and Cygwin ssh at one shared FILE: ccache
+        // before anything spawns kinit/ssh (child processes inherit KRB5CCNAME).
+        Auth.KerberosEnvironment.EnsureSharedCache();
+
         return ResolveMode(args) switch
         {
             LaunchMode.Version => PrintVersion(),
