@@ -98,8 +98,11 @@ public class JumpArgumentTests
         var proxy = Assert.Single(args, a => a.StartsWith("ProxyCommand="));
         // Absolute, forward-slashed, single-quoted ssh.exe path so busybox can run it.
         Assert.Contains("'C:/Program Files/SSHFS-Win/bin/ssh.exe'", proxy);
-        Assert.Contains("-W [%h]:%p student.ph.ed.ac.uk", proxy);
+        Assert.Contains("-W \"[%h]:%p\" student.ph.ed.ac.uk", proxy);   // quoted like OpenSSH's own
         Assert.Contains("-l rcurrie4", proxy);
+        // Password-only on the jump too (no GSSAPI) when Kerberos is off.
+        Assert.Contains("GSSAPIAuthentication=no", proxy);
+        Assert.Contains("PreferredAuthentications=password", proxy);
         Assert.DoesNotContain("/usr/bin/ssh ", proxy);   // the broken cygwin-path form
     }
 }

@@ -26,7 +26,14 @@ public sealed class WindowsMounter(Config config) : MounterBase(config)
         var sshExe = (FindSshfs() ?? DefaultSshfsPath)
             .Replace("sshfs.exe", "ssh.exe", StringComparison.OrdinalIgnoreCase)
             .Replace('\\', '/');
-        var proxy = $"'{sshExe}' -o StrictHostKeyChecking=accept-new -l {username} -W [%h]:%p {jumpHost}";
+        // Match the auth posture of the target hop: password-only (skip GSSAPI, which
+        // just fails slowly) unless Kerberos is on. The jump hop answers via the same
+        // inherited SSH_ASKPASS. Quote [%h]:%p like OpenSSH's own ProxyJump does.
+        var auth = Config.UseGssapi
+            ? "-o GSSAPIAuthentication=yes -o GSSAPIDelegateCredentials=yes"
+            : "-o GSSAPIAuthentication=no -o PreferredAuthentications=password";
+        var proxy = $"'{sshExe}' -o StrictHostKeyChecking=accept-new {auth} " +
+                    $"-l {username} -W \"[%h]:%p\" {jumpHost}";
         return ["-o", $"ProxyCommand={proxy}"];
     }
 
