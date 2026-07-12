@@ -12,6 +12,7 @@ internal static class Program
         // marker variable it inherited routes us into askpass mode.
         if (Environment.GetEnvironmentVariable(Askpass.ModeVariable) == "1")
         {
+            Askpass.ChallengeHandler = MountTool.Gui.AskpassDialog.Prompt;
             Environment.ExitCode = Askpass.Run(args.FirstOrDefault() ?? "");
             return;
         }

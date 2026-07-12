@@ -1,21 +1,23 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Layout;
-using Avalonia.Media;
-
 namespace MountTool;
 
 /// <summary>
 /// SSH_ASKPASS handler: ssh invokes this executable once per authentication
 /// prompt. The initial "user@host's password:" prompt is answered silently
 /// with the password handed over by the main process; anything else (e.g. a
-/// PAM two-factor challenge) is shown to the user in a dialog.
+/// PAM two-factor challenge) is routed to <see cref="ChallengeHandler"/>.
 /// </summary>
 public static class Askpass
 {
     public const string ModeVariable = "PPE_ASKPASS_MODE";
     public const string PasswordVariable = "PPE_ASKPASS_PASSWORD";
+
+    /// <summary>
+    /// Presents a non-password challenge (e.g. a 2FA code prompt) and returns the
+    /// user's response, or null if cancelled. Set by the front-end before
+    /// <see cref="Run"/>; when unset, the terminal fallback is used so headless
+    /// invocations still work.
+    /// </summary>
+    public static Func<string, string?>? ChallengeHandler { get; set; }
 
     public static int Run(string prompt)
     {
@@ -25,7 +27,7 @@ public static class Askpass
         // ("user@host's password:") and PAM keyboard-interactive, which sends
         // a bare "Password:" optionally prefixed with "(user@host)". Longer
         // texts (e.g. "One-time password (OATH)...") are challenges for the
-        // user and go to the dialog.
+        // user and go to the handler.
         var isLoginPasswordPrompt =
             prompt.Contains("'s password", StringComparison.OrdinalIgnoreCase)
             || System.Text.RegularExpressions.Regex.IsMatch(
@@ -43,28 +45,34 @@ public static class Askpass
             return 0;
         }
 
-        Log($"prompt=[{prompt}] -> dialog");
+        Log($"prompt=[{prompt}] -> challenge");
+        string? response;
         try
         {
-            AskpassApp.Prompt = prompt;
-            AppBuilder.Configure<AskpassApp>()
-                .UsePlatformDetect()
-                .WithInterFont()
-                .StartWithClassicDesktopLifetime([]);
+            response = (ChallengeHandler ?? ConsoleChallenge).Invoke(prompt);
         }
         catch (Exception ex)
         {
-            Log($"dialog failed: {ex}");
+            Log($"challenge failed: {ex}");
             return 1;
         }
 
-        Log($"dialog result: {(AskpassApp.Response is null ? "cancelled" : $"{AskpassApp.Response.Length} chars")}");
+        Log($"challenge result: {(response is null ? "cancelled" : $"{response.Length} chars")}");
 
-        if (AskpassApp.Response is null)
+        if (response is null)
             return 1;
 
-        WriteRawUtf8(AskpassApp.Response);
+        WriteRawUtf8(response);
         return 0;
+    }
+
+    /// <summary>Terminal fallback challenge used when no GUI handler is registered.</summary>
+    private static string? ConsoleChallenge(string prompt)
+    {
+        Console.Error.Write(string.IsNullOrWhiteSpace(prompt) ? "Response: " : prompt);
+        Console.Error.Flush();
+        var line = Console.ReadLine();
+        return line is null ? null : line + "\n";
     }
 
     /// <summary>Short non-reversible fingerprint of the secret, so logs can confirm
@@ -103,67 +111,5 @@ public static class Askpass
         {
             // Diagnostics must never break authentication.
         }
-    }
-}
-
-public class AskpassApp : Application
-{
-    public static string Prompt { get; set; } = "";
-    public static string? Response { get; set; }
-
-    public override void Initialize() => Styles.Add(new Avalonia.Themes.Fluent.FluentTheme());
-
-    public override void OnFrameworkInitializationCompleted()
-    {
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            desktop.MainWindow = BuildWindow();
-
-        base.OnFrameworkInitializationCompleted();
-    }
-
-    private static Window BuildWindow()
-    {
-        var window = new Window
-        {
-            Title = "PPE Storage — authentication",
-            SizeToContent = SizeToContent.WidthAndHeight,
-            CanResize = false,
-            WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            MaxWidth = 560,
-            Topmost = true,
-        };
-
-        var input = new TextBox { Watermark = "response" };
-
-        var ok = new Button { Content = "OK", MinWidth = 90, IsDefault = true };
-        var cancel = new Button { Content = "Cancel", MinWidth = 90, IsCancel = true };
-        ok.Click += (_, _) => { Response = input.Text ?? ""; window.Close(); };
-        cancel.Click += (_, _) => { Response = null; window.Close(); };
-
-        window.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(20),
-            Spacing = 14,
-            MinWidth = 380,
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = string.IsNullOrWhiteSpace(Prompt) ? "The server requests a response:" : Prompt,
-                    TextWrapping = TextWrapping.Wrap,
-                },
-                input,
-                new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    Spacing = 10,
-                    Children = { ok, cancel },
-                },
-            },
-        };
-
-        window.Opened += (_, _) => input.Focus();
-        return window;
     }
 }
