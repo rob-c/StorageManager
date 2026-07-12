@@ -36,7 +36,8 @@ public sealed class WindowsMounter(Config config) : MounterBase(config)
 
     public override PreflightResult? Preflight()
     {
-        if (FindSshfs() is null)
+        var sshfs = FindSshfs();
+        if (sshfs is null)
             return new PreflightResult(
                 "SSHFS-Win was not found.\n\n" +
                 "It needs WinFsp and SSHFS-Win installed. Click \"Install for me\" to do this " +
@@ -45,6 +46,28 @@ public sealed class WindowsMounter(Config config) : MounterBase(config)
                 "2. SSHFS-Win — https://github.com/winfsp/sshfs-win/releases",
                 new FixAction("Install for me", FixKindUi.WingetInstall,
                     "WinFsp.WinFsp;SSHFS-Win.SSHFS-Win"));
+
+        // A jump host needs OpenSSH's ProxyJump, which runs its proxy via /bin/sh.
+        // SSHFS-Win's cygwin bundle ships ssh.exe but no sh.exe, so we require a
+        // dependency-free POSIX shell (busybox) beside it before a jump mount works.
+        if (Config.JumpHost is not null)
+        {
+            var binDir = Path.GetDirectoryName(sshfs)!;
+            var shell = Path.Combine(binDir, "sh.exe");
+            if (!File.Exists(shell))
+            {
+                var command =
+                    "Invoke-WebRequest -Uri https://frippery.org/files/busybox/busybox.exe " +
+                    $"-OutFile \"{shell}\"";
+                return new PreflightResult(
+                    "Jump-host mounts on Windows need a small POSIX shell (sh.exe) next to SSHFS-Win, " +
+                    "which its installer doesn't include (OpenSSH runs the jump connection through " +
+                    "/bin/sh).\n\n" +
+                    "To add it once: open Windows PowerShell as Administrator, paste the copied " +
+                    "command, run it, then try connecting again.",
+                    new FixAction("Copy install command", FixKindUi.CopyCommand, command));
+            }
+        }
 
         if (Environment.GetLogicalDrives().Contains(Drive + @"\"))
             return new PreflightResult($"{Drive} is already in use.");

@@ -111,7 +111,10 @@ them (plus checksums) to a GitHub Release.
 ## Runtime prerequisites (one-time, per machine)
 
 - **Windows:** [WinFsp](https://winfsp.dev/rel/) then
-  [SSHFS-Win](https://github.com/winfsp/sshfs-win/releases)
+  [SSHFS-Win](https://github.com/winfsp/sshfs-win/releases). **For jump-host
+  mounts** SSHFS-Win also needs a POSIX `sh.exe` in its `bin` folder (OpenSSH runs
+  the jump via `/bin/sh`, which the installer omits); the app detects this and
+  gives you a one-line command to drop in [busybox-w32](https://frippery.org/files/busybox/busybox.exe).
 - **macOS:** `brew install macfuse` and `brew install gromgit/fuse/sshfs-mac`
   (macFUSE needs one-time approval in System Settings → Privacy & Security)
 - **Linux:** `sudo apt install sshfs` / `sudo dnf install fuse-sshfs`

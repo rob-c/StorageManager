@@ -14,13 +14,23 @@ public static class ErrorTranslator
     // Ordered most-specific first.
     private static readonly Rule[] Rules =
     [
+        // A jump/gateway (ProxyJump) hop that failed to start. On Windows this is
+        // usually SSHFS-Win missing its /bin/sh helper; the mount preflight offers a fix.
+        new(new Regex(@"/bin/sh:|banner exchange|Connection to UNKNOWN|ProxyJump|ProxyCommand|hostname nor servname",
+                RegexOptions.IgnoreCase),
+            "Couldn't connect through the jump host.",
+            "The connection to the jump/gateway host didn't start. On Windows this usually means " +
+            "SSHFS-Win is missing a small helper (sh.exe) — the app's checks offer to add it. " +
+            "Otherwise, check the jump host name and that you're on the university network or VPN."),
+
         new(new Regex("Permission denied|Authentication failed|Too many authentication failures",
                 RegexOptions.IgnoreCase),
             "Sign-in was rejected.",
             "Check your university username and password and try again. " +
             "If you recently changed your password, use the new one."),
 
-        new(new Regex("No such file or directory|reading remote|not a directory", RegexOptions.IgnoreCase),
+        new(new Regex("reading remote|remote directory|not a directory|No such file or directory",
+                RegexOptions.IgnoreCase),
             "That folder could not be opened.",
             "The remote folder does not exist for your account, or you don't have access to it. " +
             "Pick a different folder and try again."),

@@ -10,6 +10,7 @@ public class ErrorTranslatorTests
     [InlineData("read: Connection reset by peer", "dropped the connection")]
     [InlineData("Host key verification failed.", "known_hosts")]
     [InlineData("ssh: connect to host x port 22: Connection timed out", "VPN")]
+    [InlineData("/bin/sh: No such file or directory\nbanner exchange: Connection to UNKNOWN port 65535: Broken pipe\nread: Connection reset by peer", "jump/gateway")]
     public void Translate_maps_known_stderr(string stderr, string expectGuidanceFragment)
     {
         var e = ErrorTranslator.Translate(stderr, 1, twoFactor: false);
