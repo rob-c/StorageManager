@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using StorageManager.Connection;
 using StorageManager.Connectivity;
 using StorageManager.Errors;
 using StorageManager.Gui;
@@ -47,7 +48,13 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _watchdog;
     private DateTime _lastHealthCheck = DateTime.MinValue;
     private string _connectedUser = "";
+    private string _connectedTarget = "";
     private bool _connectedReadOnly = true;
+    private JumpConnector? _jumpConnector;
+    private bool _jumpTicking;
+    private (HostEntry Host, string Jump, string User, string RemotePath, string Target, bool ReadOnly)? _jumpReconnect;
+
+    private const string NoJump = "(no jump host)";
 
     public MainWindow()
     {
@@ -98,9 +105,21 @@ public partial class MainWindow : Window
 
         SupportLabel.Text = Support.Line;
 
-        // Jump-host mounts ride the Unix ssh/ControlMaster/sshfs stack; on Windows,
-        // MIT Kerberos install and the Status view still work, but not jump mounts.
-        JumpButton.IsVisible = !IsWindows;
+        // Optional jump host. Empty ("(no jump host)") gives a normal direct mount;
+        // choosing a jump routes the mount through it with Kerberos + a shared socket.
+        // Jump mounts ride the Unix ssh/sshfs stack, so the field is Unix-only.
+        if (IsWindows)
+        {
+            JumpLabel.IsVisible = false;
+            JumpBox.IsVisible = false;
+        }
+        else if (_baseConfig is not null)
+        {
+            JumpBox.Items.Add(NoJump);
+            foreach (var j in _baseConfig.JumpHostList)
+                JumpBox.Items.Add(j);
+            JumpBox.SelectedIndex = 0;
+        }
 
         _watchdog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _watchdog.Tick += OnWatchdogTick;
@@ -128,6 +147,12 @@ public partial class MainWindow : Window
 
     private async void OnWatchdogTick(object? sender, EventArgs e)
     {
+        if (_jumpConnector is not null)
+        {
+            await JumpTick();
+            return;
+        }
+
         if (!_connected || _mounter is not { } mounter || mounter.IsMounted)
         {
             if (_connected)
@@ -145,15 +170,16 @@ public partial class MainWindow : Window
 
     private void UpdateHealth()
     {
-        if (_mounter is null || DateTime.UtcNow - _lastHealthCheck < TimeSpan.FromSeconds(60))
+        if (!_connected || _connectedTarget.Length == 0
+            || DateTime.UtcNow - _lastHealthCheck < TimeSpan.FromSeconds(60))
             return;
         _lastHealthCheck = DateTime.UtcNow;
         try
         {
-            var root = IsWindows ? _mounter.TargetDescription + "\\" : _mounter.TargetDescription;
+            var root = IsWindows ? _connectedTarget + "\\" : _connectedTarget;
             var info = new DriveInfo(root);
             if (info.IsReady)
-                StatusLabel.Text = $"Connected as {_connectedUser} on {_mounter.TargetDescription} " +
+                StatusLabel.Text = $"Connected as {_connectedUser} on {_connectedTarget} " +
                                    $"({ModeLabel}) — {Human(info.AvailableFreeSpace)} free of {Human(info.TotalSize)}";
         }
         catch
@@ -408,7 +434,132 @@ public partial class MainWindow : Window
 
         var host = SelectedHost;
         var readOnly = ReadWriteCheck.IsChecked != true;
+
+        if (SelectedJumpHost() is { } jump)
+        {
+            await ConnectViaJump(host, jump, username, remotePath, target, readOnly, password);
+            return;
+        }
+
         await ConnectWith(host, remotePath, template, target, username, password, readOnly);
+    }
+
+    private string? SelectedJumpHost()
+    {
+        if (IsWindows)
+            return null;
+        var j = JumpBox.SelectedItem as string;
+        return string.IsNullOrEmpty(j) || j == NoJump ? null : j;
+    }
+
+    private async Task ConnectViaJump(
+        HostEntry host, string jump, string user, string remotePath, string target, bool readOnly, string password)
+    {
+        var connector = new JumpConnector(_baseConfig!);
+        if (connector.KerberosPreflight() is { } problem)
+        {
+            await PreflightDialog.ShowAsync(this, problem);
+            return;
+        }
+
+        SetBusyUi($"Checking {jump}…");
+        PasswordBox.Text = "";
+
+        var probe = await GatewayProbe.CheckAsync(jump, 22, TimeSpan.FromSeconds(4));
+        if (!probe.Reachable)
+        {
+            SetDisconnectedUi("Can't reach the jump host.", error: true);
+            await Dialogs.ShowMessageAsync(this, "Storage Manager", probe.Message!);
+            return;
+        }
+
+        SetBusyUi($"Connecting to {host.Name} via {jump}…");
+        var outcome = await connector.ConnectAsync(host.Name, user, remotePath, target, jump, password, readOnly);
+
+        if (!outcome.Success)
+        {
+            SetDisconnectedUi("Connection failed.", error: true);
+            await Dialogs.ShowMessageAsync(this, "Storage Manager", outcome.Error ?? "Could not connect.");
+            PasswordBox.Focus();
+            return;
+        }
+
+        _mounter = null;
+        _jumpConnector = connector;
+        _connected = true;
+        _connectedUser = user;
+        _connectedTarget = target;
+        _connectedReadOnly = readOnly;
+        _jumpReconnect = (host, jump, user, remotePath, target, readOnly);
+        _reconnect = null;
+
+        _saved = _saved with { Username = user, HostName = host.Name, MountTarget = target };
+        _settingsStore.Save(_saved);
+
+        SetConnectedUi(user);
+        StatusLabel.Text = $"Connected as {user} on {target} via {jump} " +
+                           $"({ModeLabel}, {(outcome.UsedKerberos ? "Kerberos" : "password")}) — SSH socket shared.";
+        OpenFolder(target);
+    }
+
+    private async Task JumpTick()
+    {
+        if (_jumpTicking || _jumpConnector is null)
+            return;
+        _jumpTicking = true;
+        try
+        {
+            switch (await _jumpConnector.TickAsync())
+            {
+                case MonitorTickResult.Healthy:
+                    UpdateHealth();
+                    break;
+                case MonitorTickResult.Watching:
+                    StatusDot.Fill = LedBusy;
+                    StatusLabel.Text = $"Connection unstable — watching… ({_connectedTarget})";
+                    break;
+                case MonitorTickResult.Reconnecting:
+                    StatusDot.Fill = LedBusy;
+                    StatusLabel.Text = "Connection dropped — reconnecting…";
+                    break;
+                case MonitorTickResult.ReconnectSucceeded:
+                    StatusDot.Fill = LedConnected;
+                    StatusLabel.Text = $"Reconnected as {_connectedUser} on {_connectedTarget}.";
+                    break;
+                case MonitorTickResult.NeedsManualReconnect:
+                    _watchdog.Stop();
+                    _connected = false;
+                    await _jumpConnector.DisconnectAsync();
+                    _jumpConnector = null;
+                    SetDisconnectedUi("Connection lost and the socket was dropped.", error: true);
+                    ReconnectButton.IsVisible = _jumpReconnect is not null;
+                    break;
+            }
+        }
+        catch
+        {
+            // A transient watchdog failure shouldn't crash the app; the next tick retries.
+        }
+        finally
+        {
+            _jumpTicking = false;
+        }
+    }
+
+    private static void OpenFolder(string path)
+    {
+        try
+        {
+            var info = OperatingSystem.IsMacOS()
+                ? new System.Diagnostics.ProcessStartInfo("/usr/bin/open", path)
+                : new System.Diagnostics.ProcessStartInfo("xdg-open", path);
+            info.UseShellExecute = false;
+            System.Diagnostics.Process.Start(info);
+        }
+        catch
+        {
+            // Non-fatal.
+        }
     }
 
     private async Task ConnectWith(
@@ -469,7 +620,10 @@ public partial class MainWindow : Window
 
         _connected = true;
         _connectedUser = username;
+        _connectedTarget = mounter.TargetDescription;
         _connectedReadOnly = readOnly;
+        _jumpConnector = null;
+        _jumpReconnect = null;
         _reconnect = new ReconnectContext(host, remotePath, target, username, readOnly);
         _saved = _saved with
         {
@@ -486,9 +640,6 @@ public partial class MainWindow : Window
 
     private async void OnReconnect(object? sender, RoutedEventArgs e)
     {
-        if (_reconnect is not { } ctx)
-            return;
-
         var password = PasswordBox.Text ?? "";
         if (password.Length == 0)
         {
@@ -496,6 +647,16 @@ public partial class MainWindow : Window
             PasswordBox.Focus();
             return;
         }
+
+        if (_jumpReconnect is { } jr)
+        {
+            ReconnectButton.IsVisible = false;
+            await ConnectViaJump(jr.Host, jr.Jump, jr.User, jr.RemotePath, jr.Target, jr.ReadOnly, password);
+            return;
+        }
+
+        if (_reconnect is not { } ctx)
+            return;
 
         ReconnectButton.IsVisible = false;
         await ConnectWith(ctx.Host, ctx.RemotePath, _saved.RemotePathTemplate ?? ctx.RemotePath,
@@ -511,14 +672,17 @@ public partial class MainWindow : Window
     private void OnOpenStatus(object? sender, RoutedEventArgs e) =>
         new StatusWindow(SelectedHost.Name, UsernameBox.Text?.Trim()).ShowDialog(this);
 
-    private void OnOpenJump(object? sender, RoutedEventArgs e) =>
-        new JumpConnectWindow(_baseConfig ?? Config.Default).ShowDialog(this);
-
     private void OnNewConnection(object? sender, RoutedEventArgs e) =>
         new MainWindow().Show();
 
     private async void OnOpen(object? sender, RoutedEventArgs e)
     {
+        if (_jumpConnector is not null)
+        {
+            OpenFolder(_connectedTarget);
+            return;
+        }
+
         if (_mounter is null)
             return;
 
@@ -537,6 +701,17 @@ public partial class MainWindow : Window
 
     private async void OnDisconnect(object? sender, RoutedEventArgs e)
     {
+        if (_jumpConnector is { } jump)
+        {
+            SetBusyUi("Disconnecting...");
+            _connected = false;
+            await jump.DisconnectAsync();
+            _jumpConnector = null;
+            _jumpReconnect = null;
+            SetDisconnectedUi("Disconnected.");
+            return;
+        }
+
         if (_mounter is null)
             return;
 
@@ -553,6 +728,23 @@ public partial class MainWindow : Window
             return;
 
         e.Cancel = true;
+
+        if (_connected && _jumpConnector is { } jump)
+        {
+            var close = await Dialogs.ConfirmAsync(this, "Disconnect Storage Manager?",
+                $"Closing this window will disconnect {_connectedTarget} and drop the SSH socket.\n\n" +
+                "Close files opened from the storage before continuing.");
+            if (!close)
+                return;
+
+            SetBusyUi("Disconnecting...");
+            _connected = false;
+            await jump.DisconnectAsync();
+            _jumpConnector = null;
+            _closeApproved = true;
+            Close();
+            return;
+        }
 
         if (_connected && _mounter is not null)
         {
@@ -621,6 +813,7 @@ public partial class MainWindow : Window
         RemoteBox.IsEnabled = enabled;
         TargetBox.IsEnabled = enabled;
         DriveBox.IsEnabled = enabled;
+        JumpBox.IsEnabled = enabled;
         ReadWriteCheck.IsEnabled = enabled;
     }
 
@@ -643,8 +836,8 @@ public partial class MainWindow : Window
         ReconnectButton.IsVisible = false;
         OpenButton.IsEnabled = true;
         DisconnectButton.IsEnabled = true;
-        OpenButton.Content = $"Open {_mounter!.TargetDescription}";
-        StatusLabel.Text = $"Connected as {username} on {_mounter.TargetDescription} ({ModeLabel})";
+        OpenButton.Content = $"Open {_connectedTarget}";
+        StatusLabel.Text = $"Connected as {username} on {_connectedTarget} ({ModeLabel})";
         StatusDot.Fill = LedConnected;
         PasswordBox.Text = "";
         _lastHealthCheck = DateTime.MinValue;

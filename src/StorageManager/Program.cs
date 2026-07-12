@@ -68,13 +68,15 @@ internal static class Program
         if (args.Contains("--gui")) return LaunchMode.Gui;
         if (args.Contains("--tui")) return LaunchMode.Tui;
 
-        // No explicit flag. Windows always uses the GUI (the binary has no
-        // console subsystem). On Unix, an interactive terminal gets the TUI.
-        if (OperatingSystem.IsWindows())
+        // No explicit flag. Windows and macOS always have a desktop, so use the GUI.
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
             return LaunchMode.Gui;
-        return !Console.IsOutputRedirected && !Console.IsInputRedirected
-            ? LaunchMode.Tui
-            : LaunchMode.Gui;
+
+        // Linux: prefer the GUI when a display is available (X11 or Wayland); fall
+        // back to the terminal UI only on headless / SSH sessions where it can't launch.
+        var hasDisplay = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"))
+                         || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
+        return hasDisplay ? LaunchMode.Gui : LaunchMode.Tui;
     }
 
     private static int RunGui(string[] args)
@@ -104,7 +106,7 @@ internal static class Program
             Storage Manager {Version}
 
             Usage:
-              StorageManager                 Launch the GUI (or the terminal UI in a console on macOS/Linux)
+              StorageManager                 Launch the GUI (falls back to the terminal UI on a headless Linux/SSH session)
               StorageManager --gui           Force the graphical interface
               StorageManager --tui           Force the terminal interface
               StorageManager --doctor [host] Audit ~/.ssh/config (add --json, --fix, --dry-run, --probe)

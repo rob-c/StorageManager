@@ -14,6 +14,7 @@ public sealed class SshfsJumpMount(
     string user,
     string remotePath,
     string mountPoint,
+    bool readOnly = true,
     IReadOnlyDictionary<string, string>? environment = null) : IJumpMount
 {
     private static readonly TimeSpan UnmountTimeout = TimeSpan.FromSeconds(10);
@@ -51,7 +52,7 @@ public sealed class SshfsJumpMount(
         }
 
         // sshfs daemonizes on success; ssh_config supplies ProxyJump/ControlMaster/GSSAPI.
-        var args = new[]
+        var args = new List<string>
         {
             $"{user}@{target}:{remotePath}",
             mountPoint,
@@ -60,6 +61,11 @@ public sealed class SshfsJumpMount(
             "-o", "ServerAliveCountMax=3",
             "-o", "StrictHostKeyChecking=accept-new",
         };
+        if (readOnly)
+        {
+            args.Add("-o");
+            args.Add("ro");
+        }
 
         var result = await runner.RunAsync("sshfs", args, stdin: null, environment, TimeSpan.FromSeconds(60), ct);
         if (result.Ok && await IsMountedAsync(ct))

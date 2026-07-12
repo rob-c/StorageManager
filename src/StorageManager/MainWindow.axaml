@@ -42,6 +42,11 @@
                Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
     <ComboBox x:Name="HostBox" HorizontalAlignment="Stretch" Margin="0,0,0,8" />
 
+    <TextBlock x:Name="JumpLabel" Text="Jump host (optional)" FontSize="12"
+               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+    <ComboBox x:Name="JumpBox" HorizontalAlignment="Stretch" Margin="0,0,0,8"
+              ToolTip.Tip="Leave as none for a direct mount. Choose a jump host to reach the target through it with Kerberos, keeping a shared SSH socket open." />
+
     <TextBlock Text="Remote folder" FontSize="12"
                Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
     <ComboBox x:Name="RemoteBox" HorizontalAlignment="Stretch" Margin="0,0,0,8" />
@@ -82,7 +87,6 @@
       <Button x:Name="DoctorButton" Classes="tool" Content="SSH Doctor…" Click="OnOpenDoctor" />
       <Button x:Name="VsCodeButton" Classes="tool" Content="VS Code…" Click="OnOpenVsCode" />
       <Button x:Name="StatusButton" Classes="tool" Content="Status…" Click="OnOpenStatus" />
-      <Button x:Name="JumpButton" Classes="tool" Content="Jump connect…" Click="OnOpenJump" />
       <Button x:Name="NewConnectionButton" Classes="tool" Content="New connection" Click="OnNewConnection" />
     </WrapPanel>
 
