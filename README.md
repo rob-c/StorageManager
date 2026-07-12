@@ -1,16 +1,51 @@
 # PPE Storage Mounter
 
-Cross-platform GUI (Windows / macOS / Linux) that mounts
-`staff.ph.ed.ac.uk:/storage/datastore-group/PPE` over SSHFS after prompting
-for a university username and password. Replaces `script.ps1`.
+Cross-platform tool (Windows / macOS / Linux) that mounts university storage
+(Edinburgh PPE datastores, CERN lxplus AFS/EOS, and more) over SSHFS after
+prompting for a university username and password. Replaces `script.ps1`.
 
 Mount target: `S:` on Windows, `~/S` on macOS and Linux.
+
+## Interfaces
+
+- **GUI** — the default when you double-click the app (always used on Windows).
+- **Terminal UI** — run `mounttool` in a terminal on macOS/Linux (or force it
+  with `--tui`); a guided Spectre.Console flow for headless/SSH sessions.
+- **SSH Doctor** — `mounttool --doctor [host]` audits `~/.ssh/config` for
+  keepalive, jump-host, DPI-resilience, and security foot-guns. Flags: `--json`,
+  `--probe` (active network tests), `--dry-run` (show the diff), `--fix` (apply,
+  writing a timestamped backup first). Also available as a button in the GUI and
+  a menu entry in the TUI. Exit codes: 0 clean, 1 findings, 2 error.
+- `mounttool --diagnostics` prints a redacted support bundle; `--help` lists all.
+
+## Features
+
+- Remembers your username, host, folder, and mount location between runs
+  (never the password) — stored under `PPEStorageMounter/settings.json` in your
+  per-user config directory.
+- Checks the server is reachable before mounting and, if not, tells you to
+  connect to the VPN rather than showing a raw error.
+- Translates sshfs/ssh failures into plain language (wrong password, missing
+  folder, host-key change, timeout…).
+- One-click prerequisite install on Windows (winget) and copyable install
+  commands on macOS/Linux.
+- Reconnect after a dropped mount (re-enter only the password), live free-space
+  display, editable "Other…" host/folder entries, system-tray minimize, and
+  multiple simultaneous mounts via "New connection".
 
 ## Building
 
 Requires the .NET 8+ SDK. `./publish.sh` produces standalone single-file
 binaries in `dist/` for win-x64, osx-arm64, osx-x64, and linux-x64 — copy the
-relevant file to users, nothing else to install for the tool itself.
+relevant file to users, nothing else to install for the tool itself. Set
+`SIGN=1` (see `docs/SIGNING.md`) to code-sign/notarize the output.
+
+## Repository layout
+
+- `src/MountTool.Core` — all logic (config, mounting, connectivity, settings,
+  diagnostics, SSH Doctor engine); no UI dependency, fully unit-tested.
+- `src/MountTool` — the executable: GUI, TUI, and CLI front-ends.
+- `tests/MountTool.Core.Tests` — xUnit tests (`dotnet test`).
 
 ## Runtime prerequisites (one-time, per machine)
 
@@ -36,7 +71,13 @@ directory (macOS/Linux).
 
 ## First-run notes for users
 
-- Windows SmartScreen: "More info" → "Run anyway" (binary is unsigned).
+- Windows SmartScreen: "More info" → "Run anyway" (binary is unsigned; see
+  `docs/SIGNING.md` to remove this).
 - macOS Gatekeeper: right-click the app → Open, first time only.
 
-Design spec: `docs/superpowers/specs/2026-07-10-cross-platform-sshfs-mounter-design.md`
+## Design & plans
+
+- `docs/superpowers/specs/2026-07-10-cross-platform-sshfs-mounter-design.md` — original design
+- `docs/superpowers/specs/2026-07-12-mounttool-features-and-ssh-doctor-design.md` — features + SSH Doctor design
+- `docs/superpowers/plans/2026-07-12-mounttool-features-and-ssh-doctor.md` — implementation plan
+- `docs/SIGNING.md` — code-signing / notarization process
