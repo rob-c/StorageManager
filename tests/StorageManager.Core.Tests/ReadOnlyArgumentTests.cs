@@ -61,7 +61,7 @@ public class JumpArgumentTests
         Assert.DoesNotContain("password_stdin", args);              // askpass answers both hops
         Assert.Contains("PreferredAuthentications=password", args);
         Assert.Contains("NumberOfPasswordPrompts=4", args);         // one per hop, with retries
-        Assert.Contains("ConnectTimeout=45", args);                 // double hop needs longer
+        Assert.Contains("ConnectTimeout=60", args);                 // double hop + slow reverse-DNS gateways
     }
 
     [Fact]
