@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>StorageManager</AssemblyName>
     <RootNamespace>StorageManager</RootNamespace>
+    <!-- Overridden by CI (-p:Version=<tag>) so release binaries report their tag. -->
+    <Version>0.1.0</Version>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <InvariantGlobalization>true</InvariantGlobalization>
     <ApplicationIcon>Assets/app.ico</ApplicationIcon>

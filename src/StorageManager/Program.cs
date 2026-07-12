@@ -1,3 +1,4 @@
+using System.Reflection;
 using Avalonia;
 using StorageManager.Cli;
 using StorageManager.Tui;
@@ -6,6 +7,21 @@ namespace StorageManager;
 
 internal static class Program
 {
+    /// <summary>Product version, from the assembly (stamped by CI to the release tag).</summary>
+    public static string Version
+    {
+        get
+        {
+            var info = typeof(Program).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            // InformationalVersion may carry +<commit> build metadata — trim it.
+            var trimmed = info?.Split('+')[0];
+            return string.IsNullOrWhiteSpace(trimmed)
+                ? typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0"
+                : trimmed;
+        }
+    }
+
     [STAThread]
     public static int Main(string[] args)
     {
@@ -24,6 +40,7 @@ internal static class Program
 
         return ResolveMode(args) switch
         {
+            LaunchMode.Version => PrintVersion(),
             LaunchMode.Doctor => DoctorCli.Run(args),
             LaunchMode.VsCode => VsCodeCliCommand.Run(args),
             LaunchMode.Status => StatusCli.Run(args),
@@ -34,10 +51,11 @@ internal static class Program
         };
     }
 
-    private enum LaunchMode { Gui, Tui, Doctor, VsCode, Status, Diagnostics, Help }
+    private enum LaunchMode { Gui, Tui, Doctor, VsCode, Status, Diagnostics, Help, Version }
 
     private static LaunchMode ResolveMode(string[] args)
     {
+        if (args.Contains("--version") || args.Contains("-V")) return LaunchMode.Version;
         if (args.Contains("--help") || args.Contains("-h")) return LaunchMode.Help;
         if (args.Contains("--doctor")) return LaunchMode.Doctor;
         if (args.Contains("--vscode")) return LaunchMode.VsCode;
@@ -70,10 +88,16 @@ internal static class Program
         return 0;
     }
 
+    private static int PrintVersion()
+    {
+        Console.WriteLine($"Storage Manager {Version}");
+        return 0;
+    }
+
     private static int PrintHelp()
     {
-        Console.WriteLine("""
-            Storage Manager
+        Console.WriteLine($"""
+            Storage Manager {Version}
 
             Usage:
               StorageManager                 Launch the GUI (or the terminal UI in a console on macOS/Linux)
@@ -85,6 +109,7 @@ internal static class Program
               StorageManager --status [host]  Kerberos ticket + storage quota/usage (add --kinit
                                         <principal>, --user, --paths a,b,c, --mount <path>)
               StorageManager --diagnostics   Print the diagnostics bundle
+              StorageManager --version       Print the version
               StorageManager --help          Show this help
 
             """ + Support.Line);

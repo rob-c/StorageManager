@@ -24,12 +24,15 @@ jobs:
       - name: Publish all platforms
         run: |
           set -e
+          # Stamp the binary with the tag version (strip the leading 'v').
+          VERSION="${GITHUB_REF_NAME#v}"
           for rid in win-x64 linux-x64 osx-x64 osx-arm64; do
             dotnet publish src/StorageManager/StorageManager.csproj \
               -r "$rid" -c Release --self-contained \
               -p:PublishSingleFile=true \
               -p:IncludeNativeLibrariesForSelfExtract=true \
               -p:DebugType=none \
+              -p:Version="${VERSION}" \
               -o "dist/$rid"
           done
 
