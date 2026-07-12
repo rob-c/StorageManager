@@ -37,3 +37,49 @@ public class ReadOnlyArgumentTests
         Assert.DoesNotContain("ro", ArgsFor(readOnly: false));
     }
 }
+
+public class JumpArgumentTests
+{
+    private static List<string> ArgsFor(string? jump, bool gssapi = false)
+    {
+        var config = Config.Default with
+        {
+            Gateway = "cplab175.ph.ed.ac.uk",
+            RemotePath = "/home/x",
+            MountTarget = "/tmp/mnt",
+            JumpHost = jump,
+            UseGssapi = gssapi,
+        };
+        return new LinuxMounter(config).BuildArguments("rcurrie4");
+    }
+
+    [Fact]
+    public void Jump_mount_adds_proxyjump_and_uses_askpass_not_stdin()
+    {
+        var args = ArgsFor("student.ph.ed.ac.uk");
+        Assert.Contains("ProxyJump=student.ph.ed.ac.uk", args);
+        Assert.DoesNotContain("password_stdin", args);              // askpass answers both hops
+        Assert.Contains("PreferredAuthentications=password", args);
+        Assert.Contains("NumberOfPasswordPrompts=4", args);         // one per hop, with retries
+    }
+
+    [Fact]
+    public void Jump_with_gssapi_prefers_kerberos_with_password_fallback()
+    {
+        var args = ArgsFor("student.ph.ed.ac.uk", gssapi: true);
+        Assert.Contains("GSSAPIAuthentication=yes", args);
+        Assert.Contains("GSSAPIDelegateCredentials=yes", args);
+        // No PreferredAuthentications: ssh's default order tries GSSAPI, then
+        // password (comma-separated -o values are unsafe under Linux FUSE).
+        Assert.DoesNotContain(args, a => a.StartsWith("PreferredAuthentications="));
+    }
+
+    [Fact]
+    public void Direct_mount_unchanged()
+    {
+        var args = ArgsFor(jump: null);
+        Assert.DoesNotContain(args, a => a.StartsWith("ProxyJump="));
+        Assert.Contains("password_stdin", args);
+        Assert.Contains("NumberOfPasswordPrompts=1", args);
+    }
+}

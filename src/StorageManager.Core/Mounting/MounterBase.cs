@@ -65,11 +65,12 @@ public abstract class MounterBase(Config config) : IMounter
 
         ConfigureEnvironment(startInfo);
 
-        if (Config.TwoFactorPam)
+        if (UsesAskpass)
         {
             // ssh re-invokes this executable for every prompt (see Askpass):
             // the password prompt is answered from the environment; PAM
-            // challenges (e.g. CERN 2FA) surface as a dialog.
+            // challenges (e.g. CERN 2FA) surface as a dialog. Jump mounts also
+            // use this so the same password answers both the jump and the target.
             startInfo.EnvironmentVariables[Askpass.ModeVariable] = "1";
             startInfo.EnvironmentVariables[Askpass.PasswordVariable] = password;
             startInfo.EnvironmentVariables["SSH_ASKPASS"] = AskpassExecutablePath();
@@ -98,7 +99,7 @@ public abstract class MounterBase(Config config) : IMounter
         _stdout = process.StandardOutput.ReadToEndAsync();
         _stderr = process.StandardError.ReadToEndAsync();
 
-        if (!Config.TwoFactorPam)
+        if (!UsesAskpass)
         {
             // The password travels via stdin only.
             await process.StandardInput.WriteLineAsync(password);
@@ -133,13 +134,8 @@ public abstract class MounterBase(Config config) : IMounter
         }
 
         var diagnostics = await CollectOutputAsync();
-        if (Config.TwoFactorPam)
-        {
-            var delivered = password.TrimEnd('\r', '\n');
-            diagnostics += $"\n\n(Delivered password: {delivered.Length} characters. " +
-                           "If that is not your password's length, re-type it carefully.)";
+        if (UsesAskpass)
             Askpass.DebugLog($"mount failed: exit={exitCode} diagnostics=[{diagnostics}]");
-        }
         await UnmountAsync();
 
         return $"The storage could not be mounted.\n\nsshfs exit code: {exitCode}\n\n{diagnostics}";
@@ -185,6 +181,11 @@ public abstract class MounterBase(Config config) : IMounter
         CleanupTarget();
     }
 
+    /// <summary>Password prompts are answered via SSH_ASKPASS rather than stdin: for 2FA
+    /// (PAM challenges need a dialog) and for jump mounts (the ProxyJump hop's ssh
+    /// cannot read sshfs's stdin, but it inherits the askpass environment).</summary>
+    protected bool UsesAskpass => Config.TwoFactorPam || Config.JumpHost is not null;
+
     internal List<string> BuildArguments(string username) =>
     [
         $"{username}@{Config.Gateway}:{Config.RemotePath}",
@@ -193,16 +194,12 @@ public abstract class MounterBase(Config config) : IMounter
         // Read-only by default (safety): sshfs honours -o ro, so the FUSE mount
         // rejects writes. Read-write is an explicit, opt-in choice in the UI.
         .. Config.ReadOnly ? new[] { "-o", "ro" } : [],
-        // No comma in the value: Linux FUSE splits comma-separated -o options,
-        // so "keyboard-interactive,password" would leak a bogus "password" mount
-        // option. 2FA hosts use keyboard-interactive exclusively anyway.
-        .. Config.TwoFactorPam
-            ? new[] { "-o", "PreferredAuthentications=keyboard-interactive" }
-            : ["-o", "password_stdin", "-o", "PreferredAuthentications=password"],
-        "-o", "PubkeyAuthentication=no",
-        // 2FA needs multiple keyboard-interactive rounds (password, then the
-        // second factor), so it must allow more than one prompt.
-        "-o", $"NumberOfPasswordPrompts={(Config.TwoFactorPam ? 6 : 1)}",
+        // Route through the SSH jump/gateway when configured (cplab boxes etc.).
+        .. Config.JumpHost is { } jump ? new[] { "-o", $"ProxyJump={jump}" } : [],
+        .. AuthArguments(),
+        // 2FA needs multiple keyboard-interactive rounds; a jump needs a prompt
+        // per hop. Extra prompts are harmless (same answer is redelivered).
+        "-o", $"NumberOfPasswordPrompts={(Config.TwoFactorPam ? 6 : Config.JumpHost is not null ? 4 : 1)}",
         "-o", "ConnectTimeout=10",
         // No "-o reconnect": when the server goes away the ssh transport must
         // exit (after ServerAlive gives up) so the watchdog can unmount cleanly.
@@ -211,6 +208,25 @@ public abstract class MounterBase(Config config) : IMounter
         "-o", $"ServerAliveCountMax={Config.KeepAliveCountMax}",
         .. ExtraSshfsArguments,
     ];
+
+    // No comma in any -o value: Linux FUSE splits comma-separated -o options, so
+    // e.g. "keyboard-interactive,password" would leak a bogus "password" option.
+    private IEnumerable<string> AuthArguments()
+    {
+        if (Config.TwoFactorPam)
+            return ["-o", "PreferredAuthentications=keyboard-interactive", "-o", "PubkeyAuthentication=no"];
+
+        if (Config.JumpHost is not null)
+            return Config.UseGssapi
+                // GSSAPI first (ssh's default preference order tries it before
+                // password, which askpass then answers as the fallback).
+                ? ["-o", "GSSAPIAuthentication=yes", "-o", "GSSAPIDelegateCredentials=yes",
+                   "-o", "PubkeyAuthentication=no"]
+                : ["-o", "PreferredAuthentications=password", "-o", "PubkeyAuthentication=no"];
+
+        return ["-o", "password_stdin", "-o", "PreferredAuthentications=password",
+                "-o", "PubkeyAuthentication=no"];
+    }
 
     private async Task<string> CollectOutputAsync()
     {

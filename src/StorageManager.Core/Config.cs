@@ -16,7 +16,13 @@ public sealed record Config(
     int KeepAliveCountMax = 3,
     bool ReadOnly = true,
     IReadOnlyList<string>? JumpHosts = null,
-    IReadOnlyDictionary<string, string>? KerberosRealms = null)
+    IReadOnlyDictionary<string, string>? KerberosRealms = null,
+    // Route this mount through an SSH jump/gateway host (ssh -o ProxyJump). The
+    // askpass mechanism answers the password on both hops. Used for hosts only
+    // reachable inside the university network (e.g. cplab boxes via student/staff).
+    string? JumpHost = null,
+    // Attempt GSSAPI (Kerberos) on the hops, falling back to password prompts.
+    bool UseGssapi = false)
 {
     public const string FileName = "mount-config.json";
 

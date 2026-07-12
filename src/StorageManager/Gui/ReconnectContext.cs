@@ -9,4 +9,6 @@ public sealed record ReconnectContext(
     string RemotePath,
     string Target,
     string Username,
-    bool ReadOnly);
+    bool ReadOnly,
+    string? JumpHost = null,
+    bool UseGssapi = false);

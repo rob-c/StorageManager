@@ -106,14 +106,11 @@ public partial class MainWindow : Window
         SupportLabel.Text = Support.Line;
 
         // Optional jump host. Empty ("(no jump host)") gives a normal direct mount;
-        // choosing a jump routes the mount through it with Kerberos + a shared socket.
-        // Jump mounts ride the Unix ssh/sshfs stack, so the field is Unix-only.
-        if (IsWindows)
-        {
-            JumpLabel.IsVisible = false;
-            JumpBox.IsVisible = false;
-        }
-        else if (_baseConfig is not null)
+        // choosing a jump routes the mount through the gateway (needed for hosts
+        // internal to the university network, e.g. cplab boxes). On Unix this also
+        // keeps a shared control socket open; on Windows it rides SSHFS-Win's
+        // ProxyJump with the password answered on both hops.
+        if (_baseConfig is not null)
         {
             JumpBox.Items.Add(NoJump);
             foreach (var j in _baseConfig.JumpHostList)
@@ -447,7 +444,15 @@ public partial class MainWindow : Window
         if (SelectedJumpHost() is { } jump)
         {
             var useKerberos = KerberosCheck.IsChecked == true;
-            await ConnectViaJump(host, jump, username, remotePath, target, readOnly, useKerberos, password);
+            if (!IsWindows)
+            {
+                // Unix: full jump stack (Kerberos option, shared ControlMaster socket).
+                await ConnectViaJump(host, jump, username, remotePath, target, readOnly, useKerberos, password);
+                return;
+            }
+            // Windows: SSHFS-Win handles ProxyJump directly; askpass answers both hops.
+            await ConnectWith(host, remotePath, template, target, username, password, readOnly,
+                jumpHost: jump, useGssapi: useKerberos);
             return;
         }
 
@@ -456,8 +461,6 @@ public partial class MainWindow : Window
 
     private string? SelectedJumpHost()
     {
-        if (IsWindows)
-            return null;
         var j = JumpBox.SelectedItem as string;
         return string.IsNullOrEmpty(j) || j == NoJump ? null : j;
     }
@@ -578,7 +581,8 @@ public partial class MainWindow : Window
 
     private async Task ConnectWith(
         HostEntry host, string remotePath, string template, string target,
-        string username, string password, bool readOnly)
+        string username, string password, bool readOnly,
+        string? jumpHost = null, bool useGssapi = false)
     {
         var mounter = CreateMounter(_baseConfig! with
         {
@@ -587,6 +591,8 @@ public partial class MainWindow : Window
             RemotePath = remotePath,
             MountTarget = target,
             ReadOnly = readOnly,
+            JumpHost = jumpHost,
+            UseGssapi = useGssapi,
         });
 
         if (mounter.Preflight() is { } problem)
@@ -606,10 +612,12 @@ public partial class MainWindow : Window
         SetBusyUi("Checking connection…");
         PasswordBox.Text = "";
 
-        var probe = await GatewayProbe.CheckAsync(host.Name, 22, TimeSpan.FromSeconds(4));
+        // A jump target isn't directly reachable by design — probe the gateway instead.
+        var probeHost = jumpHost ?? host.Name;
+        var probe = await GatewayProbe.CheckAsync(probeHost, 22, TimeSpan.FromSeconds(4));
         if (!probe.Reachable)
         {
-            SetDisconnectedUi("Can't reach the server.", error: true);
+            SetDisconnectedUi(jumpHost is null ? "Can't reach the server." : "Can't reach the jump host.", error: true);
             await Dialogs.ShowMessageAsync(this, "Storage Manager", probe.Message!);
             return;
         }
@@ -638,7 +646,7 @@ public partial class MainWindow : Window
         _connectedReadOnly = readOnly;
         _jumpConnector = null;
         _jumpReconnect = null;
-        _reconnect = new ReconnectContext(host, remotePath, target, username, readOnly);
+        _reconnect = new ReconnectContext(host, remotePath, target, username, readOnly, jumpHost, useGssapi);
         _saved = _saved with
         {
             Username = username,
@@ -649,6 +657,8 @@ public partial class MainWindow : Window
         _settingsStore.Save(_saved);
 
         SetConnectedUi(username);
+        if (jumpHost is not null)
+            StatusLabel.Text = $"Connected as {username} on {_connectedTarget} via {jumpHost} ({ModeLabel})";
         mounter.OpenInFileManager();
     }
 
@@ -674,7 +684,7 @@ public partial class MainWindow : Window
 
         ReconnectButton.IsVisible = false;
         await ConnectWith(ctx.Host, ctx.RemotePath, _saved.RemotePathTemplate ?? ctx.RemotePath,
-            ctx.Target, ctx.Username, password, ctx.ReadOnly);
+            ctx.Target, ctx.Username, password, ctx.ReadOnly, ctx.JumpHost, ctx.UseGssapi);
     }
 
     private void OnOpenDoctor(object? sender, RoutedEventArgs e) =>
