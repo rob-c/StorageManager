@@ -14,9 +14,21 @@ public sealed record Config(
     bool TwoFactorPam = false,
     int KeepAliveIntervalSeconds = 5,
     int KeepAliveCountMax = 3,
-    bool ReadOnly = true)
+    bool ReadOnly = true,
+    IReadOnlyList<string>? JumpHosts = null,
+    IReadOnlyDictionary<string, string>? KerberosRealms = null)
 {
     public const string FileName = "mount-config.json";
+
+    private static readonly string[] DefaultJumpHosts =
+        ["student.ph.ed.ac.uk", "staff.ph.ed.ac.uk"];
+
+    /// <summary>Jump-host options offered in the UI (Edinburgh gateways by default).</summary>
+    public IReadOnlyList<string> JumpHostList =>
+        JumpHosts is { Count: > 0 } ? JumpHosts : DefaultJumpHosts;
+
+    /// <summary>A realm map with any user-supplied domain→realm overrides folded in.</summary>
+    public Auth.RealmMap BuildRealmMap() => new(KerberosRealms);
 
     public static Config Default { get; } = new(
         null,
@@ -36,6 +48,16 @@ public sealed record Config(
                 "/eos/experiment/cms",
                 "/eos/experiment/lhcb",
                 "/eos/experiment/alice",
+            ]),
+            // Fermilab: direct Kerberos (GSSAPI) to a per-experiment GPVM login node.
+            // Swap the experiment (dune) in the host/paths for others (sbnd, icarus, …).
+            new("dunegpvm01.fnal.gov", TwoFactorPam: false, RemotePaths:
+            [
+                "/nashome/$USER1/$USER",
+                "/exp/dune/app/users/$USER",
+                "/exp/dune/data/users/$USER",
+                "/pnfs/dune/scratch/users/$USER",
+                "/pnfs/dune/persistent/users/$USER",
             ]),
         ]);
 

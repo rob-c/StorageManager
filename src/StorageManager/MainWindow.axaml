@@ -82,6 +82,7 @@
       <Button x:Name="DoctorButton" Classes="tool" Content="SSH Doctor…" Click="OnOpenDoctor" />
       <Button x:Name="VsCodeButton" Classes="tool" Content="VS Code…" Click="OnOpenVsCode" />
       <Button x:Name="StatusButton" Classes="tool" Content="Status…" Click="OnOpenStatus" />
+      <Button x:Name="JumpButton" Classes="tool" Content="Jump connect…" Click="OnOpenJump" />
       <Button x:Name="NewConnectionButton" Classes="tool" Content="New connection" Click="OnNewConnection" />
     </WrapPanel>
 

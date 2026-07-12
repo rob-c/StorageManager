@@ -49,7 +49,9 @@ public class KerberosHelperTests
 
         public bool HasValidTicket() => Valid;
         public string? GetKlistOutput() => Valid ? $"Default principal: {Principal}\nkrbtgt/CERN.CH@CERN.CH" : "";
-        public bool Kinit(string principal, string password) { if (KinitShouldSucceed) Valid = true; return KinitShouldSucceed; }
+        public bool Forwardable;
+        public bool Addressless;
+        public bool Kinit(string principal, string password, bool forwardable = false, bool addressless = false) { Forwardable = forwardable; Addressless = addressless; if (KinitShouldSucceed) Valid = true; return KinitShouldSucceed; }
         public bool Aklog() { AklogCalled = true; return true; }
         public bool Kdestroy() { Valid = false; return true; }
     }
