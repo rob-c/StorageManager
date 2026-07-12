@@ -23,6 +23,12 @@ Mount target: `S:` on Windows, `~/S` on macOS and Linux.
   keys — notably `remote.SSH.showLoginTerminal` so password/2FA prompts appear.
   Describe the target with `--host`, `--user`, `--jump`. Also a "VS Code…" button
   in the GUI and a TUI menu entry.
+- **Storage & Auth status** — `mounttool --status [host]` shows Kerberos ticket
+  state and storage usage/quota in one place. It can obtain a ticket
+  (`--kinit <principal>`, runs `kinit`+`aklog`) and reports per-path quotas for
+  the mounted volume and remote AFS/EOS paths (`--paths a,b,c`, `--user`,
+  `--mount`). Remote quotas are read over SSH — a Kerberos ticket lets those run
+  without a password. Also a "Status…" button in the GUI and a TUI menu entry.
 - `mounttool --diagnostics` prints a redacted support bundle; `--help` lists all.
 
 ## Support

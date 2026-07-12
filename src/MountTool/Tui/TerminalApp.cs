@@ -28,11 +28,13 @@ public static class TerminalApp
         {
             var choice = AnsiConsole.Prompt(new SelectionPrompt<string>()
                 .Title("What would you like to do?")
-                .AddChoices("Connect storage", "SSH Doctor", "VS Code remote setup", "Diagnostics", "Quit"));
+                .AddChoices("Connect storage", "Storage & Auth status", "SSH Doctor",
+                            "VS Code remote setup", "Diagnostics", "Quit"));
 
             switch (choice)
             {
                 case "Connect storage": Connect(); break;
+                case "Storage & Auth status": RunStatus(); break;
                 case "SSH Doctor": RunDoctor(); break;
                 case "VS Code remote setup": RunVsCode(); break;
                 case "Diagnostics":
@@ -194,6 +196,42 @@ public static class TerminalApp
             AnsiConsole.MarkupLineInterpolated(
                 $"[green]Applied.[/] Backup: {outcome.BackupPath ?? "(none)"}");
         }
+    }
+
+    private static void RunStatus()
+    {
+        var host = AnsiConsole.Prompt(new TextPrompt<string>("Host:").DefaultValue("lxplus.cern.ch"));
+        var user = AnsiConsole.Prompt(new TextPrompt<string>("Username:").DefaultValue(Environment.UserName));
+        var pathsRaw = AnsiConsole.Prompt(new TextPrompt<string>("Remote paths (comma-separated):")
+            .DefaultValue("/afs/cern.ch/user,/eos/user"));
+        var paths = pathsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var service = MountTool.Status.StatusService.CreateDefault();
+
+        if (AnsiConsole.Confirm("Get a Kerberos ticket first (kinit)?", false))
+        {
+            var principal = AnsiConsole.Prompt(new TextPrompt<string>("Principal:").DefaultValue($"{user}@CERN.CH"));
+            var password = AnsiConsole.Prompt(new TextPrompt<string>("Kerberos password:").Secret());
+            var after = service.Authenticate(principal, password);
+            AnsiConsole.MarkupLine(after.HasValidTicket
+                ? "[green]Ticket obtained.[/]"
+                : "[red]Could not obtain a ticket — try kinit in a terminal.[/]");
+        }
+
+        var report = service.GatherAsync(new MountTool.Status.StatusRequest(host, user, paths))
+                            .GetAwaiter().GetResult();
+
+        var k = report.Kerberos;
+        AnsiConsole.MarkupLineInterpolated($"\n[bold]Kerberos[/]: {(
+            !k.ToolsAvailable ? "[grey]tools not installed[/]" :
+            k.HasValidTicket ? $"[green]valid[/] — {k.Principal}" : "[red]no ticket[/]")}");
+
+        var table = new Table().AddColumns("Source", "Path", "Usage");
+        foreach (var q in report.Quotas)
+            table.AddRow(q.Label, q.Path, q.Describe());
+        if (report.Quotas.Count == 0)
+            table.AddRow("—", "—", "no usage data");
+        AnsiConsole.Write(table);
     }
 
     private static void RunVsCode()

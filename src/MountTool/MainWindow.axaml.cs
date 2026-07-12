@@ -497,6 +497,9 @@ public partial class MainWindow : Window
     private void OnOpenVsCode(object? sender, RoutedEventArgs e) =>
         new VsCodeWindow().ShowDialog(this);
 
+    private void OnOpenStatus(object? sender, RoutedEventArgs e) =>
+        new StatusWindow(SelectedHost.Name, UsernameBox.Text?.Trim()).ShowDialog(this);
+
     private void OnNewConnection(object? sender, RoutedEventArgs e) =>
         new MainWindow().Show();
 

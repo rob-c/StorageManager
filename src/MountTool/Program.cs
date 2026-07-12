@@ -26,6 +26,7 @@ internal static class Program
         {
             LaunchMode.Doctor => DoctorCli.Run(args),
             LaunchMode.VsCode => VsCodeCliCommand.Run(args),
+            LaunchMode.Status => StatusCli.Run(args),
             LaunchMode.Diagnostics => PrintDiagnostics(),
             LaunchMode.Tui => TerminalApp.Run(),
             LaunchMode.Help => PrintHelp(),
@@ -33,13 +34,14 @@ internal static class Program
         };
     }
 
-    private enum LaunchMode { Gui, Tui, Doctor, VsCode, Diagnostics, Help }
+    private enum LaunchMode { Gui, Tui, Doctor, VsCode, Status, Diagnostics, Help }
 
     private static LaunchMode ResolveMode(string[] args)
     {
         if (args.Contains("--help") || args.Contains("-h")) return LaunchMode.Help;
         if (args.Contains("--doctor")) return LaunchMode.Doctor;
         if (args.Contains("--vscode")) return LaunchMode.VsCode;
+        if (args.Contains("--status")) return LaunchMode.Status;
         if (args.Contains("--diagnostics")) return LaunchMode.Diagnostics;
         if (args.Contains("--gui")) return LaunchMode.Gui;
         if (args.Contains("--tui")) return LaunchMode.Tui;
@@ -80,6 +82,8 @@ internal static class Program
               mounttool --doctor [host] Audit ~/.ssh/config (add --json, --fix, --dry-run, --probe)
               mounttool --vscode [alias] Verify VS Code remote setup (add --setup to configure;
                                         --host, --user, --jump to describe the target)
+              mounttool --status [host]  Kerberos ticket + storage quota/usage (add --kinit
+                                        <principal>, --user, --paths a,b,c, --mount <path>)
               mounttool --diagnostics   Print the diagnostics bundle
               mounttool --help          Show this help
 

@@ -63,6 +63,9 @@
       <Button x:Name="VsCodeButton" Content="VS Code…" Click="OnOpenVsCode"
               Background="Transparent" Padding="0" FontSize="12"
               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+      <Button x:Name="StatusButton" Content="Status…" Click="OnOpenStatus"
+              Background="Transparent" Padding="0" FontSize="12"
+              Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
       <Button x:Name="NewConnectionButton" Content="New connection" Click="OnNewConnection"
               Background="Transparent" Padding="0" FontSize="12"
               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
