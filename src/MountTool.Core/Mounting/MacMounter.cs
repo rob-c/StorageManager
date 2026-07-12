@@ -11,6 +11,8 @@ public sealed class MacMounter(Config config) : UnixMounterBase(config)
         "macFUSE needs a one-time approval in System Settings → Privacy & Security\n" +
         "(administrator required), then a restart.";
 
+    protected override string? InstallCommand => "brew install macfuse gromgit/fuse/sshfs-mac";
+
     protected override string? FindSshfs() =>
         FindOnPath("sshfs", "/usr/local/bin", "/opt/homebrew/bin");
 

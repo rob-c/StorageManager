@@ -1,3 +1,5 @@
+using MountTool.Errors;
+
 namespace MountTool.Mounting;
 
 public abstract class UnixMounterBase(Config config) : MounterBase(config)
@@ -13,19 +15,27 @@ public abstract class UnixMounterBase(Config config) : MounterBase(config)
 
     protected abstract string InstallGuidance { get; }
 
+    /// <summary>A single shell command the user can copy to install sshfs, if one applies.</summary>
+    protected virtual string? InstallCommand => null;
+
     /// <summary>True when the target directory is currently a mount point.</summary>
     protected abstract bool IsMountPoint();
 
-    public override string? Preflight()
+    public override PreflightResult? Preflight()
     {
         if (FindSshfs() is null)
-            return $"sshfs was not found.\n\n{InstallGuidance}";
+        {
+            var fix = InstallCommand is { } cmd
+                ? new FixAction("Copy install command", FixKindUi.CopyCommand, cmd)
+                : null;
+            return new PreflightResult($"sshfs was not found.\n\n{InstallGuidance}", fix);
+        }
 
         if (IsMountPoint())
-            return $"{Target} is already a mount point. Unmount it first.";
+            return new PreflightResult($"{Target} is already a mount point. Unmount it first.");
 
         if (Directory.Exists(Target) && Directory.EnumerateFileSystemEntries(Target).Any())
-            return $"{Target} exists and is not empty. Move its contents aside first.";
+            return new PreflightResult($"{Target} exists and is not empty. Move its contents aside first.");
 
         return null;
     }

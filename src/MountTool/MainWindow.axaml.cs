@@ -229,7 +229,7 @@ public partial class MainWindow : Window
 
         if (mounter.Preflight() is { } problem)
         {
-            await Dialogs.ShowMessageAsync(this, "PPE Storage", problem);
+            await Gui.PreflightDialog.ShowAsync(this, problem);
             return;
         }
 
