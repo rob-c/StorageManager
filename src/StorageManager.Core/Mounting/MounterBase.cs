@@ -186,6 +186,12 @@ public abstract class MounterBase(Config config) : IMounter
     /// cannot read sshfs's stdin, but it inherits the askpass environment).</summary>
     protected bool UsesAskpass => Config.TwoFactorPam || Config.JumpHost is not null;
 
+    /// <summary>The ssh options that route the connection through the jump host. The
+    /// default uses OpenSSH's ProxyJump (works where a real /bin/sh runs the proxy);
+    /// Windows overrides this because SSHFS-Win's shell can't run ProxyJump's proxy.</summary>
+    protected virtual IEnumerable<string> ProxyArguments(string jumpHost, string username) =>
+        ["-o", $"ProxyJump={jumpHost}"];
+
     internal List<string> BuildArguments(string username) =>
     [
         $"{username}@{Config.Gateway}:{Config.RemotePath}",
@@ -195,7 +201,7 @@ public abstract class MounterBase(Config config) : IMounter
         // rejects writes. Read-write is an explicit, opt-in choice in the UI.
         .. Config.ReadOnly ? new[] { "-o", "ro" } : [],
         // Route through the SSH jump/gateway when configured (cplab boxes etc.).
-        .. Config.JumpHost is { } jump ? new[] { "-o", $"ProxyJump={jump}" } : [],
+        .. Config.JumpHost is { } jump ? ProxyArguments(jump, username) : [],
         .. AuthArguments(),
         // 2FA needs multiple keyboard-interactive rounds; a jump needs a prompt
         // per hop. Extra prompts are harmless (same answer is redelivered).

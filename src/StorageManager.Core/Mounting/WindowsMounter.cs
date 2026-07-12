@@ -16,6 +16,20 @@ public sealed class WindowsMounter(Config config) : MounterBase(config)
     protected override IEnumerable<string> ExtraSshfsArguments =>
         ["-o", "uid=-1,gid=-1", "-o", "ssh_command=/usr/bin/ssh.exe"];
 
+    // ProxyJump makes OpenSSH generate a hardcoded "/usr/bin/ssh" proxy command,
+    // which the bundled busybox shell (native Win32, not cygwin) can't resolve —
+    // it doesn't map /usr/bin or append .exe. So drive the proxy ourselves with an
+    // explicit, absolute ssh.exe path (forward-slashed, single-quoted for the space),
+    // authenticating the jump hop via the same inherited SSH_ASKPASS as the target.
+    protected override IEnumerable<string> ProxyArguments(string jumpHost, string username)
+    {
+        var sshExe = (FindSshfs() ?? DefaultSshfsPath)
+            .Replace("sshfs.exe", "ssh.exe", StringComparison.OrdinalIgnoreCase)
+            .Replace('\\', '/');
+        var proxy = $"'{sshExe}' -o StrictHostKeyChecking=accept-new -l {username} -W [%h]:%p {jumpHost}";
+        return ["-o", $"ProxyCommand={proxy}"];
+    }
+
     protected override void ConfigureEnvironment(ProcessStartInfo startInfo) =>
         startInfo.EnvironmentVariables["CYGFUSE"] = "WinFsp";
 

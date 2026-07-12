@@ -82,4 +82,23 @@ public class JumpArgumentTests
         Assert.Contains("password_stdin", args);
         Assert.Contains("NumberOfPasswordPrompts=1", args);
     }
+
+    [Fact]
+    public void Windows_jump_uses_explicit_proxycommand_not_proxyjump()
+    {
+        var config = Config.Default with
+        {
+            Gateway = "cplab175.ph.ed.ac.uk", RemotePath = "/home/x", MountTarget = "S:",
+            JumpHost = "student.ph.ed.ac.uk",
+        };
+        var args = new WindowsMounter(config).BuildArguments("rcurrie4");
+
+        Assert.DoesNotContain(args, a => a.StartsWith("ProxyJump="));
+        var proxy = Assert.Single(args, a => a.StartsWith("ProxyCommand="));
+        // Absolute, forward-slashed, single-quoted ssh.exe path so busybox can run it.
+        Assert.Contains("'C:/Program Files/SSHFS-Win/bin/ssh.exe'", proxy);
+        Assert.Contains("-W [%h]:%p student.ph.ed.ac.uk", proxy);
+        Assert.Contains("-l rcurrie4", proxy);
+        Assert.DoesNotContain("/usr/bin/ssh ", proxy);   // the broken cygwin-path form
+    }
 }
