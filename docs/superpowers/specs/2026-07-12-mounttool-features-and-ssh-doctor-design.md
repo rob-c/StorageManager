@@ -221,6 +221,33 @@ Avalonia's `AppBuilder` is only touched on GUI paths.
 - Presentation only; shares 100% of Core (probe, translator, mounters,
   settings, diagnostics) with the GUI.
 
+### 5.11 CERN/lxplus default storage paths
+Extend the `lxplus.cern.ch` entry in `Config.Default` from two options to the
+full set of commonly-used CERN mounts, ordered personal-first, experiment-last
+(`$USER` = username, `$USER1` = its first letter):
+
+1. `/afs/cern.ch/user/$USER1/$USER`   — AFS home *(existing)*
+2. `/afs/cern.ch/work/$USER1/$USER`   — AFS work volume
+3. `/eos/user/$USER1/$USER`           — personal EOS *(existing)*
+4. `/eos/home-$USER1/$USER`           — new-style EOS home alias
+5. `/eos/experiment/atlas`            — experiment root (not per-user)
+6. `/eos/experiment/cms`
+7. `/eos/experiment/lhcb`
+8. `/eos/experiment/alice`
+
+Notes:
+- Experiment roots are shared areas, only mountable if the user is in that
+  experiment; they carry no `$USER` substitution. They're included for
+  convenience — a failed mount surfaces the usual translated permission error
+  (§5.2).
+- The editable "Other…" entry (§5.4) still covers project spaces
+  (`/eos/project/...`) and any path not in this list, so the default list stays
+  curated rather than exhaustive.
+- Purely a `Config.Default` data change (the `RemotePaths` list on the CERN
+  `HostEntry`); no code-path changes. `RebuildRemoteOptions` already renders
+  whatever the host defines, and `SubstituteUser` already handles both `$USER`
+  and `$USER1` (leaving experiment roots untouched).
+
 ## 6. SSH Doctor
 
 ### 6.1 Pipeline
