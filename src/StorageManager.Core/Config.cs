@@ -22,7 +22,11 @@ public sealed record Config(
     // reachable inside the university network (e.g. cplab boxes via student/staff).
     string? JumpHost = null,
     // Attempt GSSAPI (Kerberos) on the hops, falling back to password prompts.
-    bool UseGssapi = false)
+    bool UseGssapi = false,
+    // Resolve symlinks on the server (sshfs -o follow_symlinks) so a mount path
+    // (or entries) that is a symlink — e.g. /scratch → local disk on cplab boxes —
+    // is followed transparently, even across devices, instead of failing.
+    bool FollowSymlinks = true)
 {
     public const string FileName = "mount-config.json";
 

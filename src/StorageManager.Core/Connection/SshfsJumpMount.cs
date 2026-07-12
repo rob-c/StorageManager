@@ -60,6 +60,8 @@ public sealed class SshfsJumpMount(
             "-o", "ServerAliveInterval=5",
             "-o", "ServerAliveCountMax=3",
             "-o", "StrictHostKeyChecking=accept-new",
+            // Follow server-side symlinks transparently (e.g. /scratch → local disk).
+            "-o", "follow_symlinks",
         };
         if (readOnly)
         {

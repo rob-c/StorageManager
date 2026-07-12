@@ -24,6 +24,13 @@ public class ReadOnlyArgumentTests
     }
 
     [Fact]
+    public void Follows_symlinks_by_default()
+    {
+        Assert.True(Config.Default.FollowSymlinks);
+        Assert.Contains("follow_symlinks", ArgsFor(readOnly: true));
+    }
+
+    [Fact]
     public void ReadOnly_mount_passes_o_ro()
     {
         var args = ArgsFor(readOnly: true);

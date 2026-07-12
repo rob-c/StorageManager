@@ -200,6 +200,9 @@ public abstract class MounterBase(Config config) : IMounter
         // Read-only by default (safety): sshfs honours -o ro, so the FUSE mount
         // rejects writes. Read-write is an explicit, opt-in choice in the UI.
         .. Config.ReadOnly ? new[] { "-o", "ro" } : [],
+        // Follow server-side symlinks (e.g. /scratch → local disk) transparently,
+        // across devices, instead of failing on a symlinked mount path or entry.
+        .. Config.FollowSymlinks ? new[] { "-o", "follow_symlinks" } : [],
         // Route through the SSH jump/gateway when configured (cplab boxes etc.).
         .. Config.JumpHost is { } jump ? ProxyArguments(jump, username) : [],
         .. AuthArguments(),
