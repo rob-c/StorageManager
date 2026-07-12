@@ -13,7 +13,8 @@ public sealed record JumpProfile(
     string ControlPath = "~/.ssh/cm/%C",
     string ControlPersist = "30s",
     int ServerAliveInterval = 5,
-    int ServerAliveCountMax = 3);
+    int ServerAliveCountMax = 3,
+    bool UseKerberos = false);
 
 /// <summary>
 /// Writes the target + jump Host blocks a jump-host mount needs into
@@ -30,31 +31,46 @@ public sealed class SshProfileWriter(IClock? clock = null)
     {
         SuggestedFix Set(string host, string keyword, string value) =>
             new($"jump profile: {host}", keyword, value, host, FixKind.SetOrReplace);
+        SuggestedFix Remove(string host, string keyword) =>
+            new($"jump profile: {host}", keyword, null, host, FixKind.RemoveLine);
 
-        return
-        [
-            // Target: reached through the jump, credentials delegated, connection multiplexed.
+        var fixes = new List<SuggestedFix>
+        {
+            // Target: reached through the jump, connection multiplexed.
             Set(p.TargetHost, "HostName", p.TargetHost),
             Set(p.TargetHost, "User", p.TargetUser),
             Set(p.TargetHost, "ProxyJump", p.JumpHost),
-            Set(p.TargetHost, "GSSAPIAuthentication", "yes"),
-            Set(p.TargetHost, "GSSAPIDelegateCredentials", "yes"),
             Set(p.TargetHost, "ControlMaster", "auto"),
             Set(p.TargetHost, "ControlPath", p.ControlPath),
             Set(p.TargetHost, "ControlPersist", p.ControlPersist),
             Set(p.TargetHost, "ServerAliveInterval", p.ServerAliveInterval.ToString()),
             Set(p.TargetHost, "ServerAliveCountMax", p.ServerAliveCountMax.ToString()),
 
-            // Jump host: Kerberos-authenticate to it, but do NOT delegate the ticket
-            // here — with ProxyJump the target hop is end-to-end, so only the target
-            // block needs GSSAPIDelegateCredentials. Delegating to the jump would hand
-            // the intermediate host your TGT unnecessarily.
             Set(p.JumpHost, "HostName", p.JumpHost),
             Set(p.JumpHost, "User", p.JumpUser),
-            Set(p.JumpHost, "GSSAPIAuthentication", "yes"),
             Set(p.JumpHost, "ServerAliveInterval", p.ServerAliveInterval.ToString()),
             Set(p.JumpHost, "ServerAliveCountMax", p.ServerAliveCountMax.ToString()),
-        ];
+        };
+
+        if (p.UseKerberos)
+        {
+            // Delegate the ticket only to the target — with ProxyJump the target hop
+            // is end-to-end, so the intermediate jump never needs (or gets) the TGT.
+            fixes.Add(Set(p.TargetHost, "GSSAPIAuthentication", "yes"));
+            fixes.Add(Set(p.TargetHost, "GSSAPIDelegateCredentials", "yes"));
+            fixes.Add(Set(p.JumpHost, "GSSAPIAuthentication", "yes"));
+        }
+        else
+        {
+            // Kerberos is off app-wide: scrub any GSSAPI directives a previous
+            // Kerberos-mode run left behind so ssh never attempts it.
+            fixes.Add(Remove(p.TargetHost, "GSSAPIAuthentication"));
+            fixes.Add(Remove(p.TargetHost, "GSSAPIDelegateCredentials"));
+            fixes.Add(Remove(p.JumpHost, "GSSAPIAuthentication"));
+            fixes.Add(Remove(p.JumpHost, "GSSAPIDelegateCredentials"));
+        }
+
+        return fixes;
     }
 
     /// <summary>Applies the profile to the config file, writing a backup first. Idempotent.

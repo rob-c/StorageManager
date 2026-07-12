@@ -61,8 +61,8 @@
               ToolTip.Tip="Off by default for safety: the mount is read-only so files can't be changed or deleted by accident. Tick this to enable writing." />
 
     <CheckBox x:Name="KerberosCheck" Margin="0,2,0,0"
-              Content="Use Kerberos sign-in (jump hosts)"
-              ToolTip.Tip="Off by default: jump-host connections use your password on both hops. Tick this to sign in with Kerberos (kinit + GSSAPI delegation) instead, which also enables automatic reconnect." />
+              Content="Use Kerberos sign-in"
+              ToolTip.Tip="Off by default: nothing in the app attempts Kerberos — jump connections use your password on both hops, and the Status view skips tickets. Tick to enable Kerberos everywhere (kinit + GSSAPI delegation for jump mounts, tickets and quota lookups in Status), which also enables automatic reconnect. Remembered between runs." />
 
     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,14,0,0">
       <Ellipse x:Name="StatusDot" Width="9" Height="9" VerticalAlignment="Center"

@@ -71,7 +71,9 @@ public class JumpConnectionTests : IDisposable
         Assert.True(cli.LastAddressless);
         Assert.Equal(1, mount.Mounts);
         Assert.True(File.Exists(Path.Combine(_dir, "config")));           // profile written
-        Assert.Contains("Host cplab175.ph.ed.ac.uk", File.ReadAllText(Path.Combine(_dir, "config")));
+        var cfg = File.ReadAllText(Path.Combine(_dir, "config"));
+        Assert.Contains("Host cplab175.ph.ed.ac.uk", cfg);
+        Assert.Contains("GSSAPIDelegateCredentials yes", cfg);            // Kerberos mode → GSSAPI in profile
     }
 
     [Fact]
@@ -154,8 +156,10 @@ public class JumpConnectionTests : IDisposable
         Assert.False(outcome.UsedKerberos);
         Assert.False(cli.Valid);            // kinit was never called
         Assert.Equal(1, mount.Mounts);
-        // Password mode: the master is established WITHOUT BatchMode so askpass can answer.
+        // Password mode: the master is established WITHOUT BatchMode so askpass can answer,
+        // and the written profile carries no GSSAPI directives.
         Assert.DoesNotContain(runner.Calls, c => c.Args.Contains("BatchMode=yes"));
+        Assert.DoesNotContain("GSSAPI", File.ReadAllText(Path.Combine(_dir, "config")));
     }
 
     [Fact]

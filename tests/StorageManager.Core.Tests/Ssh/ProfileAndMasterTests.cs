@@ -16,7 +16,8 @@ public class SshProfileWriterTests : IDisposable
 
     private readonly JumpProfile _profile = new(
         TargetHost: "cplab175.ph.ed.ac.uk", TargetUser: "rcurrie4",
-        JumpHost: "student.ph.ed.ac.uk", JumpUser: "rcurrie4");
+        JumpHost: "student.ph.ed.ac.uk", JumpUser: "rcurrie4",
+        UseKerberos: true);
 
     [Fact]
     public void Writes_target_and_jump_blocks_with_expected_effective_values()
@@ -46,6 +47,23 @@ public class SshProfileWriterTests : IDisposable
         // The TGT is delegated only to the target, never to the intermediate jump.
         Assert.Equal("yes", target["GSSAPIDelegateCredentials"]);
         Assert.False(jump.ContainsKey("GSSAPIDelegateCredentials"));
+    }
+
+    [Fact]
+    public void Kerberos_off_writes_no_gssapi_and_scrubs_stale_directives()
+    {
+        var path = Path.Combine(_dir, "config");
+        var writer = new SshProfileWriter(new FixedClock(DateTime.UnixEpoch));
+
+        // A previous Kerberos-mode run left GSSAPI directives behind…
+        writer.Apply(path, _profile);
+        Assert.Contains("GSSAPIAuthentication", File.ReadAllText(path));
+
+        // …then the switch is turned off: directives must be scrubbed, not just skipped.
+        writer.Apply(path, _profile with { UseKerberos = false });
+        var text = File.ReadAllText(path);
+        Assert.DoesNotContain("GSSAPI", text);
+        Assert.Contains("ProxyJump student.ph.ed.ac.uk", text); // the rest of the profile stays
     }
 
     [Fact]

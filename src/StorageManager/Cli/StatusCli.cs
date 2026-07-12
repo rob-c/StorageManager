@@ -22,7 +22,11 @@ public static class StatusCli
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToList();
 
-            var service = StatusService.CreateDefault();
+            // The app-wide Kerberos switch (the GUI tickbox, persisted in settings)
+            // governs the CLI too; an explicit --kinit is a deliberate opt-in.
+            var useKerberos = Settings.SettingsStore.Default.Load().UseKerberos
+                              || ValueOf(args, "--kinit") is not null;
+            var service = StatusService.CreateDefault(useKerberos);
 
             if (ValueOf(args, "--kinit") is { } principal)
             {
@@ -41,7 +45,9 @@ public static class StatusCli
 
             var k = report.Kerberos;
             Console.WriteLine("Kerberos:");
-            if (!k.ToolsAvailable)
+            if (!useKerberos)
+                Console.WriteLine("  Turned off (enable the Kerberos tickbox in the app, or pass --kinit).");
+            else if (!k.ToolsAvailable)
                 Console.WriteLine("  Kerberos tools not installed.");
             else if (k.HasValidTicket)
                 Console.WriteLine($"  Valid ticket — {k.Principal} ({k.Detail})");

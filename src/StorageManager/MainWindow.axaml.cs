@@ -112,7 +112,6 @@ public partial class MainWindow : Window
         {
             JumpLabel.IsVisible = false;
             JumpBox.IsVisible = false;
-            KerberosCheck.IsVisible = false;
         }
         else if (_baseConfig is not null)
         {
@@ -121,6 +120,15 @@ public partial class MainWindow : Window
                 JumpBox.Items.Add(j);
             JumpBox.SelectedIndex = 0;
         }
+
+        // The single app-wide Kerberos switch: restored from settings, persisted on
+        // toggle, and consulted by jump connects, the Status view, and startup.
+        KerberosCheck.IsChecked = _saved.UseKerberos;
+        KerberosCheck.IsCheckedChanged += (_, _) =>
+        {
+            _saved = _saved with { UseKerberos = KerberosCheck.IsChecked == true };
+            _settingsStore.Save(_saved);
+        };
 
         _watchdog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _watchdog.Tick += OnWatchdogTick;
@@ -459,7 +467,9 @@ public partial class MainWindow : Window
         bool readOnly, bool useKerberos, string password)
     {
         var connector = new JumpConnector(_baseConfig!);
-        if (connector.KerberosPreflight() is { } problem)
+        // Kerberos tools are only a prerequisite when Kerberos sign-in is ticked;
+        // the default password path needs no kinit/klist at all.
+        if (useKerberos && connector.KerberosPreflight() is { } problem)
         {
             await PreflightDialog.ShowAsync(this, problem);
             return;
@@ -674,7 +684,8 @@ public partial class MainWindow : Window
         new VsCodeWindow().ShowDialog(this);
 
     private void OnOpenStatus(object? sender, RoutedEventArgs e) =>
-        new StatusWindow(SelectedHost.Name, UsernameBox.Text?.Trim()).ShowDialog(this);
+        new StatusWindow(SelectedHost.Name, UsernameBox.Text?.Trim(),
+            useKerberos: KerberosCheck.IsChecked == true).ShowDialog(this);
 
     private void OnNewConnection(object? sender, RoutedEventArgs e) =>
         new MainWindow().Show();

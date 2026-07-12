@@ -15,7 +15,7 @@ namespace StorageManager.Gui;
 /// </summary>
 public sealed class StatusWindow : Window
 {
-    private readonly StatusService _service = StatusService.CreateDefault();
+    private readonly StatusService _service;
 
     private readonly TextBox _host = new() { Text = "lxplus.cern.ch", Width = 220 };
     private readonly TextBox _user = new() { Text = Environment.UserName, Width = 220 };
@@ -33,8 +33,9 @@ public sealed class StatusWindow : Window
     private readonly StackPanel _quotas = new() { Spacing = 10 };
     private readonly TextBlock _status = new() { FontSize = 12, TextWrapping = TextWrapping.Wrap };
 
-    public StatusWindow(string? host = null, string? user = null)
+    public StatusWindow(string? host = null, string? user = null, bool useKerberos = false)
     {
+        _service = StatusService.CreateDefault(useKerberos);
         if (host is not null) _host.Text = host;
         if (user is not null) _user.Text = user;
 
@@ -48,6 +49,15 @@ public sealed class StatusWindow : Window
         refresh.Click += async (_, _) => await RefreshAsync();
         var getTicket = new Button { Content = "Get ticket", MinWidth = 100 };
         getTicket.Click += async (_, _) => await GetTicketAsync();
+
+        // The app-wide Kerberos switch lives in the main window; when off, the
+        // ticket controls here are inert and say so.
+        if (!useKerberos)
+        {
+            _principal.IsEnabled = false;
+            _password.IsEnabled = false;
+            getTicket.IsEnabled = false;
+        }
 
         var body = new StackPanel { Spacing = 12 };
         body.Children.Add(Section("Host"));
@@ -150,9 +160,11 @@ public sealed class StatusWindow : Window
 
         var k = report.Kerberos;
         _kerberosDot.Fill = new SolidColorBrush(
-            !k.ToolsAvailable ? Color.Parse("#8A8F98") :
+            !_service.KerberosEnabled || !k.ToolsAvailable ? Color.Parse("#8A8F98") :
             k.HasValidTicket ? Color.Parse("#2BC5A8") : Color.Parse("#E05252"));
-        _kerberos.Text = !k.ToolsAvailable ? "Kerberos tools not installed."
+        _kerberos.Text = !_service.KerberosEnabled
+            ? "Kerberos sign-in is turned off — enable it in the main window to use tickets."
+            : !k.ToolsAvailable ? "Kerberos tools not installed."
             : k.HasValidTicket ? $"Valid ticket — {k.Principal}  ({k.Detail})"
             : "No valid ticket. Enter a principal and click Get ticket.";
 

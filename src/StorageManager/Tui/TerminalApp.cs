@@ -210,7 +210,24 @@ public static class TerminalApp
         catch (Exception ex) { AnsiConsole.MarkupLineInterpolated($"[red]{ex.Message}[/]"); return; }
 
         var connector = new StorageManager.Gui.JumpConnector(config);
-        if (connector.KerberosPreflight() is { } problem)
+        var saved = SettingsStore.Default.Load();
+
+        var target = AnsiConsole.Prompt(new TextPrompt<string>("Final [green]target[/]:").DefaultValue("cplab175.ph.ed.ac.uk"));
+        var jump = AnsiConsole.Prompt(new SelectionPrompt<string>().Title("Jump [green]host[/]").AddChoices(config.JumpHostList));
+        var user = AnsiConsole.Prompt(new TextPrompt<string>("[green]Username[/]:").DefaultValue(Environment.UserName));
+        var mount = AnsiConsole.Prompt(new TextPrompt<string>("Mount [green]location[/]:")
+            .DefaultValue(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "S-remote")));
+
+        // Defaults to the app-wide Kerberos switch; the answer is saved back so the
+        // GUI tickbox and this prompt stay one setting.
+        var useKerberos = AnsiConsole.Confirm(
+            "Use [yellow]Kerberos[/] sign-in? (otherwise your password is used on both hops)",
+            saved.UseKerberos);
+        if (useKerberos != saved.UseKerberos)
+            SettingsStore.Default.Save(saved with { UseKerberos = useKerberos });
+
+        // Kerberos tools are only a prerequisite when Kerberos is chosen.
+        if (useKerberos && connector.KerberosPreflight() is { } problem)
         {
             AnsiConsole.MarkupLineInterpolated($"[red]{problem.Message}[/]");
             if (problem.Fix is { Kind: StorageManager.Errors.FixKindUi.CopyCommand } fix)
@@ -218,12 +235,6 @@ public static class TerminalApp
             return;
         }
 
-        var target = AnsiConsole.Prompt(new TextPrompt<string>("Final [green]target[/]:").DefaultValue("cplab175.ph.ed.ac.uk"));
-        var jump = AnsiConsole.Prompt(new SelectionPrompt<string>().Title("Jump [green]host[/]").AddChoices(config.JumpHostList));
-        var user = AnsiConsole.Prompt(new TextPrompt<string>("[green]Username[/]:").DefaultValue(Environment.UserName));
-        var mount = AnsiConsole.Prompt(new TextPrompt<string>("Mount [green]location[/]:")
-            .DefaultValue(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "S-remote")));
-        var useKerberos = AnsiConsole.Confirm("Use [yellow]Kerberos[/] sign-in? (default is your password on both hops)", false);
         var password = AnsiConsole.Prompt(new TextPrompt<string>("[green]Password[/]:").Secret());
 
         StorageManager.Connection.JumpConnectOutcome outcome = default!;
@@ -260,9 +271,10 @@ public static class TerminalApp
             .DefaultValue("/afs/cern.ch/user,/eos/user"));
         var paths = pathsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        var service = StorageManager.Status.StatusService.CreateDefault();
+        var useKerberos = SettingsStore.Default.Load().UseKerberos;
+        var service = StorageManager.Status.StatusService.CreateDefault(useKerberos);
 
-        if (AnsiConsole.Confirm("Get a Kerberos ticket first (kinit)?", false))
+        if (useKerberos && AnsiConsole.Confirm("Get a Kerberos ticket first (kinit)?", false))
         {
             var principal = AnsiConsole.Prompt(new TextPrompt<string>("Principal:").DefaultValue($"{user}@CERN.CH"));
             var password = AnsiConsole.Prompt(new TextPrompt<string>("Kerberos password:").Secret());
@@ -277,6 +289,7 @@ public static class TerminalApp
 
         var k = report.Kerberos;
         AnsiConsole.MarkupLineInterpolated($"\n[bold]Kerberos[/]: {(
+            !useKerberos ? "[grey]turned off[/]" :
             !k.ToolsAvailable ? "[grey]tools not installed[/]" :
             k.HasValidTicket ? $"[green]valid[/] — {k.Principal}" : "[red]no ticket[/]")}");
 

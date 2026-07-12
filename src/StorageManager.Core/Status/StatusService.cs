@@ -17,18 +17,22 @@ public sealed record StatusReport(
 
 /// <summary>
 /// Single entry point for the "Storage &amp; Auth status" view: composes the
-/// Kerberos ticket state and per-path usage/quota into one report. Remote quota
-/// calls (which need the host) reuse whatever credential is available — notably
-/// a Kerberos ticket obtained via the same view.
+/// Kerberos ticket state and per-path usage/quota into one report. The whole
+/// Kerberos half honors the app-wide switch (the single UI tickbox): when off,
+/// no klist/kinit ever runs and remote quota SSH does not attempt GSSAPI.
 /// </summary>
-public sealed class StatusService(KerberosHelper kerberos, QuotaProbe quota)
+public sealed class StatusService(KerberosHelper kerberos, QuotaProbe quota, bool useKerberos)
 {
-    public static StatusService CreateDefault() =>
-        new(new KerberosHelper(new KerberosCli()), new QuotaProbe(new SshRemoteExec()));
+    public static StatusService CreateDefault(bool useKerberos) =>
+        new(new KerberosHelper(new KerberosCli()),
+            new QuotaProbe(new SshRemoteExec(useGssapi: useKerberos)),
+            useKerberos);
+
+    public bool KerberosEnabled => useKerberos;
 
     public async Task<StatusReport> GatherAsync(StatusRequest request, CancellationToken ct = default)
     {
-        var kerberosStatus = kerberos.Status();
+        var kerberosStatus = useKerberos ? kerberos.Status() : KerberosStatus.Off;
 
         var quotas = new List<QuotaInfo>();
         if (request.LocalMountPath is { Length: > 0 } local
@@ -42,5 +46,5 @@ public sealed class StatusService(KerberosHelper kerberos, QuotaProbe quota)
     }
 
     public KerberosStatus Authenticate(string principal, string password) =>
-        kerberos.Authenticate(principal, password);
+        useKerberos ? kerberos.Authenticate(principal, password) : KerberosStatus.Off;
 }

@@ -40,7 +40,9 @@ internal static class Program
 
         // On Windows, point MIT Kerberos and Cygwin ssh at one shared FILE: ccache
         // before anything spawns kinit/ssh (child processes inherit KRB5CCNAME).
-        Auth.KerberosEnvironment.EnsureSharedCache();
+        // Only when Kerberos is enabled (the app-wide tickbox, persisted in settings).
+        if (Settings.SettingsStore.Default.Load().UseKerberos)
+            Auth.KerberosEnvironment.EnsureSharedCache();
 
         return ResolveMode(args) switch
         {

@@ -12,6 +12,10 @@ public sealed record KerberosStatus(
 {
     public static KerberosStatus NoTools { get; } =
         new(false, false, null, null, "Kerberos tools (kinit/klist) were not found.");
+
+    /// <summary>Kerberos is switched off app-wide (the UI tickbox is unticked).</summary>
+    public static KerberosStatus Off { get; } =
+        new(false, false, null, null, "Kerberos sign-in is turned off.");
 }
 
 /// <summary>Abstracts the Kerberos command-line tools so the helper is testable.</summary>

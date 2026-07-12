@@ -83,8 +83,10 @@ public sealed class JumpConnection(
         }
 
         // 2. Write the ssh_config profile (target + jump blocks), backed up first.
+        //    GSSAPI directives are only written (and otherwise scrubbed) per the switch.
         profileWriter.Apply(sshConfigPath,
-            new JumpProfile(req.TargetHost, req.TargetUser, req.JumpHost, req.JumpUser));
+            new JumpProfile(req.TargetHost, req.TargetUser, req.JumpHost, req.JumpUser,
+                UseKerberos: usedKerberos));
 
         // 3. Bring up the shared master through the jump. Kerberos → non-interactive
         //    (BatchMode); password → let SSH_ASKPASS answer the prompts.
