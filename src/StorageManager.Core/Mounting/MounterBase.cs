@@ -206,7 +206,9 @@ public abstract class MounterBase(Config config) : IMounter
         // 2FA needs multiple keyboard-interactive rounds; a jump needs a prompt
         // per hop. Extra prompts are harmless (same answer is redelivered).
         "-o", $"NumberOfPasswordPrompts={(Config.TwoFactorPam ? 6 : Config.JumpHost is not null ? 4 : 1)}",
-        "-o", "ConnectTimeout=10",
+        // A jump is a double hop (authenticate the gateway, then reach the target
+        // through it), so give it much longer to complete the banner exchange.
+        "-o", $"ConnectTimeout={(Config.JumpHost is not null ? 45 : 10)}",
         // No "-o reconnect": when the server goes away the ssh transport must
         // exit (after ServerAlive gives up) so the watchdog can unmount cleanly.
         "-o", "StrictHostKeyChecking=accept-new",
