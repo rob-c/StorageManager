@@ -47,6 +47,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _watchdog;
     private DateTime _lastHealthCheck = DateTime.MinValue;
     private string _connectedUser = "";
+    private bool _connectedReadOnly = true;
 
     public MainWindow()
     {
@@ -148,8 +149,8 @@ public partial class MainWindow : Window
             var root = IsWindows ? _mounter.TargetDescription + "\\" : _mounter.TargetDescription;
             var info = new DriveInfo(root);
             if (info.IsReady)
-                StatusLabel.Text = $"Connected as {_connectedUser} on {_mounter.TargetDescription} — " +
-                                   $"{Human(info.AvailableFreeSpace)} free of {Human(info.TotalSize)}";
+                StatusLabel.Text = $"Connected as {_connectedUser} on {_mounter.TargetDescription} " +
+                                   $"({ModeLabel}) — {Human(info.AvailableFreeSpace)} free of {Human(info.TotalSize)}";
         }
         catch
         {
@@ -165,6 +166,8 @@ public partial class MainWindow : Window
         while (size >= 1024 && u < units.Length - 1) { size /= 1024; u++; }
         return $"{size:0.#} {units[u]}";
     }
+
+    private string ModeLabel => _connectedReadOnly ? "read-only" : "read-write";
 
     private HostEntry SelectedHost =>
         _baseConfig!.HostList.FirstOrDefault(h => h.Name == HostBox.SelectedItem as string)
@@ -400,11 +403,13 @@ public partial class MainWindow : Window
         }
 
         var host = SelectedHost;
-        await ConnectWith(host, remotePath, template, target, username, password);
+        var readOnly = ReadWriteCheck.IsChecked != true;
+        await ConnectWith(host, remotePath, template, target, username, password, readOnly);
     }
 
     private async Task ConnectWith(
-        HostEntry host, string remotePath, string template, string target, string username, string password)
+        HostEntry host, string remotePath, string template, string target,
+        string username, string password, bool readOnly)
     {
         var mounter = CreateMounter(_baseConfig! with
         {
@@ -412,6 +417,7 @@ public partial class MainWindow : Window
             TwoFactorPam = host.TwoFactorPam,
             RemotePath = remotePath,
             MountTarget = target,
+            ReadOnly = readOnly,
         });
 
         if (mounter.Preflight() is { } problem)
@@ -459,7 +465,8 @@ public partial class MainWindow : Window
 
         _connected = true;
         _connectedUser = username;
-        _reconnect = new ReconnectContext(host, remotePath, target, username);
+        _connectedReadOnly = readOnly;
+        _reconnect = new ReconnectContext(host, remotePath, target, username, readOnly);
         _saved = _saved with
         {
             Username = username,
@@ -488,7 +495,7 @@ public partial class MainWindow : Window
 
         ReconnectButton.IsVisible = false;
         await ConnectWith(ctx.Host, ctx.RemotePath, _saved.RemotePathTemplate ?? ctx.RemotePath,
-            ctx.Target, ctx.Username, password);
+            ctx.Target, ctx.Username, password, ctx.ReadOnly);
     }
 
     private void OnOpenDoctor(object? sender, RoutedEventArgs e) =>
@@ -607,6 +614,7 @@ public partial class MainWindow : Window
         RemoteBox.IsEnabled = enabled;
         TargetBox.IsEnabled = enabled;
         DriveBox.IsEnabled = enabled;
+        ReadWriteCheck.IsEnabled = enabled;
     }
 
     private void SetBusyUi(string status)
@@ -629,7 +637,7 @@ public partial class MainWindow : Window
         OpenButton.IsEnabled = true;
         DisconnectButton.IsEnabled = true;
         OpenButton.Content = $"Open {_mounter!.TargetDescription}";
-        StatusLabel.Text = $"Connected as {username} on {_mounter.TargetDescription}";
+        StatusLabel.Text = $"Connected as {username} on {_mounter.TargetDescription} ({ModeLabel})";
         StatusDot.Fill = LedConnected;
         PasswordBox.Text = "";
         _lastHealthCheck = DateTime.MinValue;

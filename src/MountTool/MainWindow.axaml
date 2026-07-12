@@ -51,6 +51,10 @@
     <TextBox x:Name="TargetBox" />
     <ComboBox x:Name="DriveBox" IsVisible="False" HorizontalAlignment="Stretch" />
 
+    <CheckBox x:Name="ReadWriteCheck" Margin="0,10,0,0"
+              Content="Allow read-write access (writable)"
+              ToolTip.Tip="Off by default for safety: the mount is read-only so files can't be changed or deleted by accident. Tick this to enable writing." />
+
     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,14,0,0">
       <Ellipse x:Name="StatusDot" Width="9" Height="9" VerticalAlignment="Center"
                Fill="{DynamicResource TextFillColorTertiaryBrush}" />

@@ -75,12 +75,15 @@ public static class TerminalApp
 
         var password = AnsiConsole.Prompt(new TextPrompt<string>("University [green]password[/]:").Secret());
 
+        var writable = AnsiConsole.Confirm("Allow [yellow]read-write[/] access? (default is safer read-only)", false);
+
         var mounter = CreateMounter(config with
         {
             Gateway = host.Name,
             TwoFactorPam = host.TwoFactorPam,
             RemotePath = remotePath,
             MountTarget = target,
+            ReadOnly = !writable,
         });
 
         if (mounter.Preflight() is { } problem)
@@ -129,7 +132,8 @@ public static class TerminalApp
             MountTarget = target,
         });
 
-        AnsiConsole.MarkupLineInterpolated($"[green]Connected[/] as {username} on {mounter.TargetDescription}");
+        AnsiConsole.MarkupLineInterpolated(
+            $"[green]Connected[/] as {username} on {mounter.TargetDescription} ({(writable ? "read-write" : "read-only")})");
         SessionMenu(mounter);
     }
 

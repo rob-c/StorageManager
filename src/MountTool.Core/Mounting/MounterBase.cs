@@ -185,11 +185,14 @@ public abstract class MounterBase(Config config) : IMounter
         CleanupTarget();
     }
 
-    private List<string> BuildArguments(string username) =>
+    internal List<string> BuildArguments(string username) =>
     [
         $"{username}@{Config.Gateway}:{Config.RemotePath}",
         MountTarget,
         "-f",
+        // Read-only by default (safety): sshfs honours -o ro, so the FUSE mount
+        // rejects writes. Read-write is an explicit, opt-in choice in the UI.
+        .. Config.ReadOnly ? new[] { "-o", "ro" } : [],
         // No comma in the value: Linux FUSE splits comma-separated -o options,
         // so "keyboard-interactive,password" would leak a bogus "password" mount
         // option. 2FA hosts use keyboard-interactive exclusively anyway.

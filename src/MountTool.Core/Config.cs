@@ -13,7 +13,8 @@ public sealed record Config(
     IReadOnlyList<HostEntry>? Hosts = null,
     bool TwoFactorPam = false,
     int KeepAliveIntervalSeconds = 5,
-    int KeepAliveCountMax = 3)
+    int KeepAliveCountMax = 3,
+    bool ReadOnly = true)
 {
     public const string FileName = "mount-config.json";
 

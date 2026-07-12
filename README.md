@@ -38,6 +38,9 @@ appears in the app window, the TUI, `--help`, and the diagnostics bundle.
 
 ## Features
 
+- **Mounts read-only by default for safety** — files can't be changed or deleted
+  by accident. Tick "Allow read-write access" (GUI) or answer the read-write
+  prompt (TUI) to enable writing; the connected status line shows the mode.
 - Remembers your username, host, folder, and mount location between runs
   (never the password) — stored under `PPEStorageMounter/settings.json` in your
   per-user config directory.

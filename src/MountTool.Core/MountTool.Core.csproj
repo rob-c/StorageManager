@@ -6,4 +6,7 @@
     <RootNamespace>MountTool</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="MountTool.Core.Tests" />
+  </ItemGroup>
 </Project>

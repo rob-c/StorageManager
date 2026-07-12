@@ -8,4 +8,5 @@ public sealed record ReconnectContext(
     HostEntry Host,
     string RemotePath,
     string Target,
-    string Username);
+    string Username,
+    bool ReadOnly);
