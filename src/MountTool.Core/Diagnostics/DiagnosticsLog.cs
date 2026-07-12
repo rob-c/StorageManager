@@ -64,6 +64,7 @@ public sealed class DiagnosticsLog
         sb.AppendLine($"OS: {RuntimeInformation.OSDescription} ({RuntimeInformation.OSArchitecture})");
         sb.AppendLine($"Runtime: {RuntimeInformation.FrameworkDescription}");
         sb.AppendLine($"Tool: {typeof(DiagnosticsLog).Assembly.GetName().Version}");
+        sb.AppendLine($"Support: {Support.Name} <{Support.Email}>");
         sb.AppendLine(new string('-', 40));
         foreach (var line in _ring)
             sb.AppendLine(line);

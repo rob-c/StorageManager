@@ -16,7 +16,19 @@ Mount target: `S:` on Windows, `~/S` on macOS and Linux.
   `--probe` (active network tests), `--dry-run` (show the diff), `--fix` (apply,
   writing a timestamped backup first). Also available as a button in the GUI and
   a menu entry in the TUI. Exit codes: 0 clean, 1 findings, 2 error.
+- **VS Code remote setup** — `mounttool --vscode [alias]` verifies (and with
+  `--setup` configures) VS Code for remote development: installs the Remote
+  Development extensions via the `code` CLI, writes an `~/.ssh/config` Host block
+  (with `ProxyJump` for jump hosts, backed up first), and sets the Remote-SSH
+  keys — notably `remote.SSH.showLoginTerminal` so password/2FA prompts appear.
+  Describe the target with `--host`, `--user`, `--jump`. Also a "VS Code…" button
+  in the GUI and a TUI menu entry.
 - `mounttool --diagnostics` prints a redacted support bundle; `--help` lists all.
+
+## Support
+
+Need help? Contact **Robert Currie** (rob.currie@ed.ac.uk). The contact also
+appears in the app window, the TUI, `--help`, and the diagnostics bundle.
 
 ## Features
 

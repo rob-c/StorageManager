@@ -25,6 +25,7 @@ internal static class Program
         return ResolveMode(args) switch
         {
             LaunchMode.Doctor => DoctorCli.Run(args),
+            LaunchMode.VsCode => VsCodeCliCommand.Run(args),
             LaunchMode.Diagnostics => PrintDiagnostics(),
             LaunchMode.Tui => TerminalApp.Run(),
             LaunchMode.Help => PrintHelp(),
@@ -32,12 +33,13 @@ internal static class Program
         };
     }
 
-    private enum LaunchMode { Gui, Tui, Doctor, Diagnostics, Help }
+    private enum LaunchMode { Gui, Tui, Doctor, VsCode, Diagnostics, Help }
 
     private static LaunchMode ResolveMode(string[] args)
     {
         if (args.Contains("--help") || args.Contains("-h")) return LaunchMode.Help;
         if (args.Contains("--doctor")) return LaunchMode.Doctor;
+        if (args.Contains("--vscode")) return LaunchMode.VsCode;
         if (args.Contains("--diagnostics")) return LaunchMode.Diagnostics;
         if (args.Contains("--gui")) return LaunchMode.Gui;
         if (args.Contains("--tui")) return LaunchMode.Tui;
@@ -76,9 +78,12 @@ internal static class Program
               mounttool --gui           Force the graphical interface
               mounttool --tui           Force the terminal interface
               mounttool --doctor [host] Audit ~/.ssh/config (add --json, --fix, --dry-run, --probe)
+              mounttool --vscode [alias] Verify VS Code remote setup (add --setup to configure;
+                                        --host, --user, --jump to describe the target)
               mounttool --diagnostics   Print the diagnostics bundle
               mounttool --help          Show this help
-            """);
+
+            """ + Support.Line);
         return 0;
     }
 }

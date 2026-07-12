@@ -95,6 +95,8 @@ public partial class MainWindow : Window
 
         Closing += OnClosing;
 
+        SupportLabel.Text = Support.Line;
+
         _watchdog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _watchdog.Tick += OnWatchdogTick;
     }
@@ -463,6 +465,9 @@ public partial class MainWindow : Window
 
     private void OnOpenDoctor(object? sender, RoutedEventArgs e) =>
         new DoctorWindow().ShowDialog(this);
+
+    private void OnOpenVsCode(object? sender, RoutedEventArgs e) =>
+        new VsCodeWindow().ShowDialog(this);
 
     private void OnNewConnection(object? sender, RoutedEventArgs e) =>
         new MainWindow().Show();

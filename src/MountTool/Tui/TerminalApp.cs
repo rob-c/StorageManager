@@ -21,18 +21,20 @@ public static class TerminalApp
         Environment.SetEnvironmentVariable("PPE_ASKPASS_UI", "tui");
 
         AnsiConsole.Write(new FigletText("PPE Storage").Color(Color.Teal));
-        AnsiConsole.MarkupLine("[grey]University datastore mounter — terminal mode[/]\n");
+        AnsiConsole.MarkupLine("[grey]University datastore mounter — terminal mode[/]");
+        AnsiConsole.MarkupLineInterpolated($"[grey]{Support.Line}[/]\n");
 
         while (true)
         {
             var choice = AnsiConsole.Prompt(new SelectionPrompt<string>()
                 .Title("What would you like to do?")
-                .AddChoices("Connect storage", "SSH Doctor", "Diagnostics", "Quit"));
+                .AddChoices("Connect storage", "SSH Doctor", "VS Code remote setup", "Diagnostics", "Quit"));
 
             switch (choice)
             {
                 case "Connect storage": Connect(); break;
                 case "SSH Doctor": RunDoctor(); break;
+                case "VS Code remote setup": RunVsCode(); break;
                 case "Diagnostics":
                     AnsiConsole.WriteLine(Diagnostics.DiagnosticsLog.Instance.BuildBundle());
                     break;
@@ -185,6 +187,37 @@ public static class TerminalApp
             AnsiConsole.MarkupLineInterpolated(
                 $"[green]Applied.[/] Backup: {outcome.BackupPath ?? "(none)"}");
         }
+    }
+
+    private static void RunVsCode()
+    {
+        var alias = AnsiConsole.Prompt(new TextPrompt<string>("ssh_config [green]alias[/]:").DefaultValue("lxplus"));
+        var host = AnsiConsole.Prompt(new TextPrompt<string>("[green]Host name[/]:").DefaultValue($"{alias}.cern.ch"));
+        var user = AnsiConsole.Prompt(new TextPrompt<string>("[green]Username[/]:").DefaultValue(Environment.UserName));
+        var jump = AnsiConsole.Prompt(new TextPrompt<string>("[green]Jump host[/] (blank for none):")
+            .AllowEmpty());
+
+        var target = new MountTool.VsCode.VsCodeTarget(
+            alias, host, user, string.IsNullOrWhiteSpace(jump) ? null : jump);
+        var setup = new MountTool.VsCode.VsCodeSetup(new MountTool.VsCode.VsCodeCli());
+        var sshConfig = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh", "config");
+        var settings = MountTool.VsCode.VsCodeSettings.DefaultPath;
+
+        if (AnsiConsole.Confirm("Set up now (install extensions + write config)?", false))
+        {
+            var result = setup.Setup(target, sshConfig, settings);
+            if (result.Error is not null)
+            {
+                AnsiConsole.MarkupLineInterpolated($"[red]{result.Error}[/]");
+                AnsiConsole.MarkupLineInterpolated($"[grey]{Support.Line}[/]");
+                return;
+            }
+        }
+
+        foreach (var c in setup.Verify(target, sshConfig, settings).Checks)
+            AnsiConsole.MarkupLineInterpolated(
+                $"{(c.Ok ? "[green]OK[/]" : "[red]!![/]")} {c.Label} — {c.Detail}");
     }
 
     private static string SubstituteUser(string template, string username) =>

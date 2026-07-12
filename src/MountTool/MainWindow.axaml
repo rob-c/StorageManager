@@ -60,10 +60,16 @@
       <Button x:Name="DoctorButton" Content="SSH Doctor…" Click="OnOpenDoctor"
               Background="Transparent" Padding="0" FontSize="12"
               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+      <Button x:Name="VsCodeButton" Content="VS Code…" Click="OnOpenVsCode"
+              Background="Transparent" Padding="0" FontSize="12"
+              Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
       <Button x:Name="NewConnectionButton" Content="New connection" Click="OnNewConnection"
               Background="Transparent" Padding="0" FontSize="12"
               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
     </StackPanel>
+
+    <TextBlock x:Name="SupportLabel" FontSize="11" Margin="0,14,0,0" TextWrapping="Wrap"
+               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
 
   </StackPanel>
 </Window>
