@@ -35,7 +35,10 @@ public abstract class UnixMounterBase(Config config) : MounterBase(config)
             return new PreflightResult($"{Target} is already a mount point. Unmount it first.");
 
         if (Directory.Exists(Target) && Directory.EnumerateFileSystemEntries(Target).Any())
-            return new PreflightResult($"{Target} exists and is not empty. Move its contents aside first.");
+            return new PreflightResult(
+                $"{Target} is not empty. Mounting here hides its current contents until you " +
+                "disconnect (they are not deleted and reappear afterwards).",
+                Fix: null, Blocking: false);
 
         return null;
     }

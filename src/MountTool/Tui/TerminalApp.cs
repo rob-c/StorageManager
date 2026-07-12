@@ -83,10 +83,17 @@ public static class TerminalApp
 
         if (mounter.Preflight() is { } problem)
         {
-            AnsiConsole.MarkupLineInterpolated($"[red]{problem.Message}[/]");
-            if (problem.Fix is { Kind: FixKindUi.CopyCommand } fix)
-                AnsiConsole.MarkupLineInterpolated($"[yellow]Run:[/] {fix.Payload}");
-            return;
+            if (problem.Blocking)
+            {
+                AnsiConsole.MarkupLineInterpolated($"[red]{problem.Message}[/]");
+                if (problem.Fix is { Kind: FixKindUi.CopyCommand } fix)
+                    AnsiConsole.MarkupLineInterpolated($"[yellow]Run:[/] {fix.Payload}");
+                return;
+            }
+
+            AnsiConsole.MarkupLineInterpolated($"[yellow]{problem.Message}[/]");
+            if (!AnsiConsole.Confirm("Mount here anyway?", defaultValue: false))
+                return;
         }
 
         var probe = GatewayProbe.CheckAsync(host.Name, 22, TimeSpan.FromSeconds(4))

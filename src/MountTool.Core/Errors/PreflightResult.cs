@@ -16,6 +16,8 @@ public sealed record FixAction(string Label, FixKindUi Kind, string Payload);
 
 /// <summary>
 /// The outcome of a mount preflight: a user-facing message and, when we know how
-/// to help, an actionable <see cref="FixAction"/>.
+/// to help, an actionable <see cref="FixAction"/>. <see cref="Blocking"/> is true
+/// for problems that must be resolved before mounting; false for advisories the
+/// user may acknowledge and proceed past (e.g. a non-empty mount directory).
 /// </summary>
-public sealed record PreflightResult(string Message, FixAction? Fix = null);
+public sealed record PreflightResult(string Message, FixAction? Fix = null, bool Blocking = true);

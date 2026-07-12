@@ -294,19 +294,20 @@ public partial class MainWindow : Window
             var used = Environment.GetLogicalDrives()
                 .Select(d => d.TrimEnd('\\'))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var free = Enumerable.Range('D', 'Z' - 'D' + 1)
-                .Select(c => $"{(char)c}:")
-                .Where(d => !used.Contains(d))
-                .ToList();
 
             var preferred = _saved.MountTarget ?? _baseConfig!.MountTarget ?? "S:";
-            if (!free.Contains(preferred, StringComparer.OrdinalIgnoreCase))
-                free.Insert(0, preferred);
+            string? firstFree = null;
 
-            foreach (var drive in free)
-                DriveBox.Items.Add(drive);
+            // A configured/remembered preferred drive outside the D–Z range still
+            // offered if it is free (selectable string) or shown greyed if in use.
+            if (!IsStandardDriveInRange(preferred))
+                AddDrive(preferred, used, ref firstFree);
 
-            DriveBox.SelectedItem = free.First(d => d.Equals(preferred, StringComparison.OrdinalIgnoreCase));
+            foreach (var c in Enumerable.Range('D', 'Z' - 'D' + 1))
+                AddDrive($"{(char)c}:", used, ref firstFree);
+
+            // Select the preferred drive if it is free, otherwise the first free one.
+            DriveBox.SelectedItem = used.Contains(preferred) ? firstFree : preferred;
         }
         else
         {
@@ -314,6 +315,25 @@ public partial class MainWindow : Window
                 ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "S");
         }
     }
+
+    // Adds a drive to the picker: a selectable string when free, or a greyed,
+    // non-selectable "X: (in use)" entry when the letter is already taken.
+    private void AddDrive(string drive, HashSet<string> used, ref string? firstFree)
+    {
+        if (used.Contains(drive))
+        {
+            DriveBox.Items.Add(new ComboBoxItem { Content = $"{drive} (in use)", IsEnabled = false });
+        }
+        else
+        {
+            DriveBox.Items.Add(drive);
+            firstFree ??= drive;
+        }
+    }
+
+    private static bool IsStandardDriveInRange(string drive) =>
+        drive.Length == 2 && drive[1] == ':'
+        && char.ToUpperInvariant(drive[0]) is >= 'D' and <= 'Z';
 
     private void RefreshRemoteOptionTexts()
     {
@@ -396,8 +416,16 @@ public partial class MainWindow : Window
 
         if (mounter.Preflight() is { } problem)
         {
-            await PreflightDialog.ShowAsync(this, problem);
-            return;
+            if (problem.Blocking)
+            {
+                await PreflightDialog.ShowAsync(this, problem);
+                return;
+            }
+
+            var proceed = await Dialogs.ConfirmAsync(this, "PPE Storage",
+                $"{problem.Message}\n\nContinue and mount here anyway?");
+            if (!proceed)
+                return;
         }
 
         SetBusyUi("Checking connection…");
