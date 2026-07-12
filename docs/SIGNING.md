@@ -53,6 +53,6 @@ for the current single-file distribution.
 No signing ecosystem equivalent. Publish GPG-signed SHA-256 checksums alongside
 the `linux-x64` binary so users can verify integrity:
 ```
-sha256sum dist/linux-x64/PPEStorage > PPEStorage.sha256
-gpg --detach-sign --armor PPEStorage.sha256
+sha256sum dist/linux-x64/StorageManager > StorageManager.sha256
+gpg --detach-sign --armor StorageManager.sha256
 ```

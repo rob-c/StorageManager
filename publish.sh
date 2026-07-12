@@ -7,7 +7,7 @@
 #   macOS:   MAC_SIGN_ID (Developer ID Application) and, to notarize,
 #            NOTARY_PROFILE (a stored notarytool keychain profile)
 set -e
-cd "$(dirname "$0")/src/MountTool"
+cd "$(dirname "$0")/src/StorageManager"
 
 for rid in win-x64 osx-arm64 osx-x64 linux-x64; do
     dotnet publish -r "$rid" -c Release --self-contained \
@@ -19,7 +19,7 @@ done
 echo "SIGN=1 — signing published binaries"
 
 sign_windows() {
-    exe="../../dist/win-x64/PPEStorage.exe"
+    exe="../../dist/win-x64/StorageManager.exe"
     [ -f "$exe" ] || return 0
     if [ "$AZURE_SIGN" = "1" ]; then
         # Azure Trusted Signing via AzureSignTool (dotnet tool install --global AzureSignTool).
@@ -41,11 +41,11 @@ sign_windows() {
 sign_macos() {
     [ -n "$MAC_SIGN_ID" ] || { echo "  (skipping macOS: set MAC_SIGN_ID)"; return 0; }
     for rid in osx-arm64 osx-x64; do
-        app="../../dist/$rid/PPEStorage"
+        app="../../dist/$rid/StorageManager"
         [ -f "$app" ] || continue
         codesign --force --options runtime --timestamp --sign "$MAC_SIGN_ID" "$app"
         if [ -n "$NOTARY_PROFILE" ]; then
-            zip="../../dist/$rid/PPEStorage.zip"
+            zip="../../dist/$rid/StorageManager.zip"
             ditto -c -k --keepParent "$app" "$zip"
             xcrun notarytool submit "$zip" --keychain-profile "$NOTARY_PROFILE" --wait
             # Single-file binaries can't be stapled directly; notarization is

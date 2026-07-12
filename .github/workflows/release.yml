@@ -1,0 +1,52 @@
+name: Release
+
+# Build self-contained single-file binaries for all platforms and attach them
+# to a GitHub Release whenever a version tag (e.g. v1.0.0) is pushed.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish all platforms
+        run: |
+          set -e
+          for rid in win-x64 linux-x64 osx-x64 osx-arm64; do
+            dotnet publish src/StorageManager/StorageManager.csproj \
+              -r "$rid" -c Release --self-contained \
+              -p:PublishSingleFile=true \
+              -p:IncludeNativeLibrariesForSelfExtract=true \
+              -p:DebugType=none \
+              -o "dist/$rid"
+          done
+
+      - name: Collect and checksum artifacts
+        run: |
+          set -e
+          mkdir -p out
+          cp dist/win-x64/StorageManager.exe   out/StorageManager-win-x64.exe
+          cp dist/linux-x64/StorageManager     out/StorageManager-linux-x64
+          cp dist/osx-x64/StorageManager       out/StorageManager-osx-x64
+          cp dist/osx-arm64/StorageManager     out/StorageManager-osx-arm64
+          cd out && sha256sum * > SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" out/* \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes
