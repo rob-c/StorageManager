@@ -43,6 +43,31 @@ public class SshProfileWriterTests : IDisposable
         Assert.Equal("student.ph.ed.ac.uk", jump["HostName"]);
         Assert.Equal("yes", jump["GSSAPIAuthentication"]);
         Assert.False(jump.ContainsKey("ProxyJump")); // jump has no jump
+        // The TGT is delegated only to the target, never to the intermediate jump.
+        Assert.Equal("yes", target["GSSAPIDelegateCredentials"]);
+        Assert.False(jump.ContainsKey("GSSAPIDelegateCredentials"));
+    }
+
+    [Fact]
+    public void Creates_control_socket_directory()
+    {
+        var path = Path.Combine(_dir, "config");
+        new SshProfileWriter(new FixedClock(DateTime.UnixEpoch)).Apply(path, _profile);
+        // Default ControlPath is ~/.ssh/cm/%C — the cm dir must exist afterwards.
+        var cm = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh", "cm");
+        Assert.True(Directory.Exists(cm));
+    }
+
+    [Theory]
+    [InlineData("host\n    ProxyCommand evil", "rcurrie4")]
+    [InlineData("good.host", "bad user")]
+    [InlineData("has space", "rcurrie4")]
+    public void Rejects_injection_in_host_or_user(string target, string user)
+    {
+        var bad = _profile with { TargetHost = target, TargetUser = user };
+        Assert.Throws<ArgumentException>(() =>
+            new SshProfileWriter(new FixedClock(DateTime.UnixEpoch)).Apply(Path.Combine(_dir, "config"), bad));
     }
 
     [Fact]

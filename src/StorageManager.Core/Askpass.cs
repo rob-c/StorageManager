@@ -37,8 +37,9 @@ public static class Askpass
         {
             // Defend against a stray line ending riding along in the password.
             password = password.TrimEnd('\r', '\n');
-            Log($"prompt=[{prompt}] -> silent password len={password.Length} " +
-                $"ascii={password.All(char.IsAscii)} fp={Fingerprint(password)}");
+            // Never log anything derived from the secret (length/hash/fingerprint can
+            // help an offline guesser). Record only that a password prompt was answered.
+            Log($"prompt=[{prompt}] -> silent password");
             // Every conventional askpass terminates its answer with a newline,
             // which ssh strips; cygwin ssh's line reader needs it before EOF.
             WriteRawUtf8(password + "\n");
@@ -73,14 +74,6 @@ public static class Askpass
         Console.Error.Flush();
         var line = Console.ReadLine();
         return line is null ? null : line + "\n";
-    }
-
-    /// <summary>Short non-reversible fingerprint of the secret, so logs can confirm
-    /// the delivered value is stable and matches expectations without exposing it.</summary>
-    private static string Fingerprint(string text)
-    {
-        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text));
-        return Convert.ToHexString(hash)[..6];
     }
 
     /// <summary>Writes to stdout as raw UTF-8 bytes, immune to console codepage translation.</summary>

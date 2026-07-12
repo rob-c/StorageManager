@@ -79,14 +79,61 @@ public class ConnectionMonitorTests
         h.Healthy = false;
         h.Clock.Advance(TimeSpan.FromSeconds(16));
 
-        // Tick repeatedly; reconnect keeps failing.
+        // Tick repeatedly; reconnect keeps failing. Advance the clock past the
+        // backoff each round so attempts are actually spent (not gated).
         var results = new List<MonitorTickResult>();
-        for (var i = 0; i < 6; i++)
+        for (var i = 0; i < 8; i++)
+        {
             results.Add(await m.TickAsync());
+            h.Clock.Advance(TimeSpan.FromSeconds(90));
+        }
 
         Assert.Equal(1, h.Teardowns);                 // only torn down once
         Assert.Equal(3, h.ReconnectAttempts);          // capped at MaxReconnectAttempts
         Assert.Equal(MonitorTickResult.NeedsManualReconnect, results[^1]);
+    }
+
+    [Fact]
+    public async Task Backoff_gates_attempts_without_advancing_time()
+    {
+        var h = new Harness { ReconnectSucceeds = false };
+        var m = h.Build(new MonitorOptions(TimeSpan.FromSeconds(15), MaxReconnectAttempts: 5));
+        h.Healthy = false;
+        h.Clock.Advance(TimeSpan.FromSeconds(16));
+
+        await m.TickAsync();                 // first attempt: immediate
+        Assert.Equal(1, h.ReconnectAttempts);
+        await m.TickAsync();                 // no time passed → gated by backoff
+        await m.TickAsync();
+        Assert.Equal(1, h.ReconnectAttempts); // still 1: backoff not elapsed
+        Assert.Equal(MonitorTickResult.Reconnecting, m.LastResult);
+    }
+
+    [Fact]
+    public async Task Reconnect_that_does_not_restore_health_keeps_counting_attempts()
+    {
+        // Reconnect claims success but the link stays broken → must not reset the counter.
+        var h = new Harness();
+        var m = h.Build(new MonitorOptions(TimeSpan.FromSeconds(15), MaxReconnectAttempts: 2));
+        h.Healthy = false;
+        h.ReconnectSucceeds = true;      // returns true...
+        // ...but the reconnect delegate does NOT actually restore health:
+        var mm = new ConnectionMonitor(
+            checkHealthy: _ => Task.FromResult(false),
+            teardown: _ => { h.Teardowns++; return Task.CompletedTask; },
+            reconnect: _ => { h.ReconnectAttempts++; return Task.FromResult(true); },
+            hasValidTicket: () => true,
+            clock: () => h.Clock.Now,
+            options: new MonitorOptions(TimeSpan.FromSeconds(15), 2));
+        h.Clock.Advance(TimeSpan.FromSeconds(16));
+
+        var r1 = await mm.TickAsync();
+        h.Clock.Advance(TimeSpan.FromSeconds(90));
+        var r2 = await mm.TickAsync();
+        h.Clock.Advance(TimeSpan.FromSeconds(90));
+        var r3 = await mm.TickAsync();
+
+        Assert.Equal(MonitorTickResult.NeedsManualReconnect, r3); // hit the cap, not an infinite loop
     }
 
     [Fact]

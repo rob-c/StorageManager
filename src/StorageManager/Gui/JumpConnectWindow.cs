@@ -37,13 +37,15 @@ public sealed class JumpConnectWindow : Window
     private readonly Button _disconnect = new() { Content = "Disconnect", MinWidth = 110, IsEnabled = false };
 
     private bool _connected;
+    private bool _ticking;
+    private bool _closing;
 
     public JumpConnectWindow(Config config)
     {
         _config = config;
         _connector = new JumpConnector(config);
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-        _timer.Tick += async (_, _) => await OnTick();
+        _timer.Tick += (_, _) => _ = OnTick();
 
         Title = "Jump-host connect";
         Width = 520;
@@ -98,14 +100,26 @@ public sealed class JumpConnectWindow : Window
         };
 
         _led.Fill = LedIdle;
-        Closing += async (_, e) =>
-        {
-            if (_connected)
-            {
-                _timer.Stop();
-                await _connector.DisconnectAsync();
-            }
-        };
+        Closing += OnClosing;
+    }
+
+    private void OnClosing(object? sender, WindowClosingEventArgs e)
+    {
+        // Don't let the window close out from under an in-flight teardown; cancel,
+        // finish unmount + socket exit, then close for real.
+        if (!_connected || _closing)
+            return;
+        e.Cancel = true;
+        _closing = true;
+        _ = TeardownThenClose();
+    }
+
+    private async Task TeardownThenClose()
+    {
+        _timer.Stop();
+        try { await _connector.DisconnectAsync(); } catch { /* best effort */ }
+        _connected = false;
+        Close();
     }
 
     private static Control Row(string label, Control input) => new StackPanel
@@ -182,8 +196,25 @@ public sealed class JumpConnectWindow : Window
 
     private async Task OnTick()
     {
-        if (!_connected)
-            return;
+        if (!_connected || _ticking)
+            return; // never let a slow tick overlap the next one
+        _ticking = true;
+        try
+        {
+            await RunTick();
+        }
+        catch
+        {
+            // A transient tick failure shouldn't crash the app; the next tick retries.
+        }
+        finally
+        {
+            _ticking = false;
+        }
+    }
+
+    private async Task RunTick()
+    {
         var result = await _connector.TickAsync();
         switch (result)
         {

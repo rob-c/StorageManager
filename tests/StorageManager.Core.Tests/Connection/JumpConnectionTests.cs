@@ -29,7 +29,7 @@ public class JumpConnectionTests : IDisposable
         public bool Mounted;
         public int Mounts, Unmounts;
         public string? MountError;
-        public bool IsMounted => Mounted;
+        public Task<bool> IsMountedAsync(CancellationToken ct = default) => Task.FromResult(Mounted);
         public Task<string?> MountAsync(CancellationToken ct = default) { Mounts++; if (MountError is null) Mounted = true; return Task.FromResult(MountError); }
         public Task UnmountAsync(CancellationToken ct = default) { Unmounts++; Mounted = false; return Task.CompletedTask; }
     }

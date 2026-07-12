@@ -30,7 +30,8 @@ public sealed record JumpConnectOutcome(JumpSession? Session, string? Error, boo
 /// <summary>The mount half of a jump connection (kept behind an interface so orchestration is testable).</summary>
 public interface IJumpMount
 {
-    bool IsMounted { get; }
+    /// <summary>True while the target is mounted. Async so liveness checks never block the UI thread.</summary>
+    Task<bool> IsMountedAsync(CancellationToken ct = default);
     /// <summary>Mounts; returns null on success or a user-facing error.</summary>
     Task<string?> MountAsync(CancellationToken ct = default);
     Task UnmountAsync(CancellationToken ct = default);
@@ -55,6 +56,13 @@ public sealed class JumpConnection(
 {
     public async Task<JumpConnectOutcome> ConnectAsync(JumpRequest req, IJumpMount mount, CancellationToken ct = default)
     {
+        // 0. Reject unsafe host/user strings up front (ssh_config injection defense).
+        if (!SshName.IsValidHost(req.TargetHost) || !SshName.IsValidHost(req.JumpHost)
+            || !SshName.IsValidUser(req.TargetUser) || !SshName.IsValidUser(req.JumpUser))
+            return new JumpConnectOutcome(null,
+                "The host or username contains characters that aren't allowed. " +
+                "Use plain host names and usernames.", false);
+
         // 1. Kerberos (primary). No realm/tools → password fallback handled by the mount itself.
         var usedKerberos = false;
         var realm = realmMap.RealmFor(req.TargetHost);
@@ -94,7 +102,8 @@ public sealed class JumpConnection(
 
         // 5. Watchdog: healthy = master alive AND mount present; reconnect uses the ticket.
         var monitor = new ConnectionMonitor(
-            checkHealthy: async c => await master.IsAliveAsync(req.TargetHost, sshConfigPath, c) && mount.IsMounted,
+            checkHealthy: async c => await master.IsAliveAsync(req.TargetHost, sshConfigPath, c)
+                                     && await mount.IsMountedAsync(c),
             teardown: async c =>
             {
                 await mount.UnmountAsync(c);

@@ -45,20 +45,49 @@ public sealed class SshProfileWriter(IClock? clock = null)
             Set(p.TargetHost, "ServerAliveInterval", p.ServerAliveInterval.ToString()),
             Set(p.TargetHost, "ServerAliveCountMax", p.ServerAliveCountMax.ToString()),
 
-            // Jump host: same auth/keepalive posture.
+            // Jump host: Kerberos-authenticate to it, but do NOT delegate the ticket
+            // here — with ProxyJump the target hop is end-to-end, so only the target
+            // block needs GSSAPIDelegateCredentials. Delegating to the jump would hand
+            // the intermediate host your TGT unnecessarily.
             Set(p.JumpHost, "HostName", p.JumpHost),
             Set(p.JumpHost, "User", p.JumpUser),
             Set(p.JumpHost, "GSSAPIAuthentication", "yes"),
-            Set(p.JumpHost, "GSSAPIDelegateCredentials", "yes"),
             Set(p.JumpHost, "ServerAliveInterval", p.ServerAliveInterval.ToString()),
             Set(p.JumpHost, "ServerAliveCountMax", p.ServerAliveCountMax.ToString()),
         ];
     }
 
-    /// <summary>Applies the profile to the config file, writing a backup first. Idempotent.</summary>
+    /// <summary>Applies the profile to the config file, writing a backup first. Idempotent.
+    /// Validates host/user names (defense in depth against ssh_config injection) and
+    /// creates the ControlPath parent directory, which OpenSSH will not create itself.</summary>
     public FixOutcome Apply(string configPath, JumpProfile p)
     {
+        SshName.Validate(p.TargetHost, p.TargetUser, p.JumpHost, p.JumpUser);
         Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
+        EnsureControlPathDirectory(p.ControlPath);
         return _fixer.Apply(configPath, BuildFixes(p), dryRun: false);
+    }
+
+    /// <summary>Creates the directory that holds the ControlMaster sockets (e.g. ~/.ssh/cm).</summary>
+    private static void EnsureControlPathDirectory(string controlPath)
+    {
+        try
+        {
+            var expanded = controlPath.StartsWith('~')
+                ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + controlPath[1..]
+                : controlPath;
+            // Drop the final token component (e.g. %C) to get the parent directory.
+            var dir = Path.GetDirectoryName(expanded);
+            if (string.IsNullOrEmpty(dir))
+                return;
+            if (OperatingSystem.IsWindows())
+                Directory.CreateDirectory(dir);
+            else
+                Directory.CreateDirectory(dir, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+        catch
+        {
+            // If we can't pre-create it, ssh will surface a clear bind error.
+        }
     }
 }

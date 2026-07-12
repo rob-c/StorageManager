@@ -16,9 +16,27 @@ public sealed class SshfsJumpMount(
     string mountPoint,
     IReadOnlyDictionary<string, string>? environment = null) : IJumpMount
 {
+    private static readonly TimeSpan UnmountTimeout = TimeSpan.FromSeconds(10);
     private bool _createdDir;
 
-    public bool IsMounted => MountPointLive(mountPoint);
+    public async Task<bool> IsMountedAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var target = Path.TrimEndingDirectorySeparator(Path.GetFullPath(mountPoint));
+            if (File.Exists("/proc/mounts"))
+                return File.ReadLines("/proc/mounts")
+                    .Select(l => l.Split(' '))
+                    .Any(f => f.Length > 1 && Unescape(f[1]) == target);
+            // macOS: parse `mount` via the injected runner (no blocking subprocess on the UI thread).
+            var r = await runner.RunAsync("/sbin/mount", [], stdin: null, null, TimeSpan.FromSeconds(5), ct);
+            return r.Stdout.Contains($" on {target} (");
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     public async Task<string?> MountAsync(CancellationToken ct = default)
     {
@@ -44,7 +62,7 @@ public sealed class SshfsJumpMount(
         };
 
         var result = await runner.RunAsync("sshfs", args, stdin: null, environment, TimeSpan.FromSeconds(60), ct);
-        if (result.Ok && IsMounted)
+        if (result.Ok && await IsMountedAsync(ct))
             return null;
 
         CleanupDir();
@@ -54,18 +72,23 @@ public sealed class SshfsJumpMount(
 
     public async Task UnmountAsync(CancellationToken ct = default)
     {
-        // fusermount on Linux, umount on macOS; both best-effort.
+        // Bounded so a hung fusermount on a dead FUSE mount can't block teardown.
         if (OperatingSystem.IsLinux())
         {
-            if (!(await runner.RunAsync("fusermount", ["-u", mountPoint], ct: ct)).Ok)
-                await runner.RunAsync("fusermount3", ["-u", mountPoint], ct: ct);
+            if (!(await Run("fusermount", ["-u", mountPoint], ct)).Ok
+                && !(await Run("fusermount3", ["-u", mountPoint], ct)).Ok)
+                await Run("fusermount", ["-uz", mountPoint], ct); // lazy detach as a last resort
         }
         else
         {
-            await runner.RunAsync("umount", [mountPoint], ct: ct);
+            if (!(await Run("umount", [mountPoint], ct)).Ok)
+                await Run("umount", ["-f", mountPoint], ct);
         }
         CleanupDir();
     }
+
+    private Task<ProcessResult> Run(string file, string[] args, CancellationToken ct) =>
+        runner.RunAsync(file, args, stdin: null, null, UnmountTimeout, ct);
 
     private void CleanupDir()
     {

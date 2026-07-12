@@ -39,7 +39,14 @@ public sealed class ConnectionMonitor
     private readonly Func<DateTime> _clock;
     private readonly MonitorOptions _opts;
 
+    // Backoff between reconnect attempts (first is immediate), so MaxReconnectAttempts
+    // spans a couple of minutes rather than being burned in a few ticks.
+    private static readonly TimeSpan[] Backoff =
+        [TimeSpan.Zero, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15),
+         TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(60)];
+
     private DateTime _lastHealthy;
+    private DateTime? _lastAttempt;
     private int _reconnectAttempts;
     private bool _tornDown;
 
@@ -67,6 +74,7 @@ public sealed class ConnectionMonitor
     public void MarkHealthy()
     {
         _lastHealthy = _clock();
+        _lastAttempt = null;
         _reconnectAttempts = 0;
         _tornDown = false;
         LastResult = MonitorTickResult.Healthy;
@@ -78,8 +86,7 @@ public sealed class ConnectionMonitor
         if (Stopped)
             return MonitorTickResult.NeedsManualReconnect;
 
-        var healthy = await _checkHealthy(ct);
-        if (healthy)
+        if (await _checkHealthy(ct))
         {
             MarkHealthy();
             return LastResult;
@@ -94,14 +101,23 @@ public sealed class ConnectionMonitor
         {
             await _teardown(ct);
             _tornDown = true;
+            _lastAttempt = null;
         }
 
         if (!_hasValidTicket() || _reconnectAttempts >= _opts.MaxReconnectAttempts)
             return LastResult = MonitorTickResult.NeedsManualReconnect;
 
+        // Wait out the backoff before spending another attempt.
+        var wait = Backoff[Math.Min(_reconnectAttempts, Backoff.Length - 1)];
+        if (_lastAttempt is { } last && _clock() - last < wait)
+            return LastResult = MonitorTickResult.Reconnecting;
+
         _reconnectAttempts++;
-        var reconnected = await _reconnect(ct);
-        if (reconnected)
+        _lastAttempt = _clock();
+        // Trust a reconnect only if a real health check agrees — otherwise a
+        // reconnect that "succeeds" but leaves the link broken would reset the
+        // attempt counter forever and the retry cap could never be reached.
+        if (await _reconnect(ct) && await _checkHealthy(ct))
         {
             MarkHealthy();
             return LastResult = MonitorTickResult.ReconnectSucceeded;

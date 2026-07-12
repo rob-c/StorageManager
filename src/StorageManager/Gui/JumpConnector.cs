@@ -17,11 +17,12 @@ public sealed class JumpConnector
     private string? _target;
     private string? _configPath;
 
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
     public JumpConnector(Config config) => _config = config;
 
     public JumpSession? Session { get; private set; }
     public bool UsedKerberos => Session?.UsedKerberos ?? false;
-    public bool IsMounted => _mount?.IsMounted ?? false;
 
     /// <summary>Checks the Kerberos tools are present; returns a remediation or null.</summary>
     public Errors.PreflightResult? KerberosPreflight() =>
@@ -57,14 +58,30 @@ public sealed class JumpConnector
     public Task<MonitorTickResult> TickAsync(CancellationToken ct = default) =>
         Session is { } s ? s.Monitor.TickAsync(ct) : Task.FromResult(MonitorTickResult.Healthy);
 
+    /// <summary>Tears down the mount and master socket. Idempotent and safe to call
+    /// concurrently (the timer teardown, the Disconnect button, and window close
+    /// can all race); a second call is a no-op.</summary>
     public async Task DisconnectAsync(CancellationToken ct = default)
     {
-        if (_mount is { } m)
-            await m.UnmountAsync(ct);
-        if (_master is { } master && _target is { } t)
-            await master.ExitAsync(t, _configPath, ct);
-        Session = null;
-        _mount = null;
-        _master = null;
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var mount = _mount;
+            var master = _master;
+            var target = _target;
+            _mount = null;
+            _master = null;
+            _target = null;
+            Session = null;
+
+            if (mount is not null)
+                await mount.UnmountAsync(ct);
+            if (master is not null && target is not null)
+                await master.ExitAsync(target, _configPath, ct);
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 }
