@@ -15,10 +15,12 @@ for rid in win-x64 osx-arm64 osx-x64 linux-x64; do
         -o "../../dist/$rid"
 done
 
-# Mark the Unix binaries executable, and package the macOS ones as double-clickable
-# .app bundles (dist/StorageManager-osx-*.zip). VERSION is read from the csproj.
+# Mark the Unix binaries executable and package them: the macOS ones as
+# double-clickable .app bundles and the Linux one as a tarball with a .desktop
+# entry + icon (dist/StorageManager-*). VERSION is read from the csproj.
 chmod +x ../../dist/linux-x64/StorageManager
 VERSION=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' StorageManager.csproj | head -1)
+bash "../../packaging/make-linux-tarball.sh" "../../dist/linux-x64/StorageManager" "${VERSION:-0.0.0}" "../../dist"
 for arch in osx-arm64 osx-x64; do
     chmod +x "../../dist/$arch/StorageManager"
     bash "../../packaging/make-macos-app.sh" "../../dist/$arch/StorageManager" "$arch" "${VERSION:-0.0.0}" "../../dist"

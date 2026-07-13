@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Storage Manager
+GenericName=Storage Mounter
+Comment=Mount university storage over SSHFS
+Exec=__EXEC__
+Icon=__ICON__
+Terminal=false
+Categories=Utility;Network;FileTransfer;
+Keywords=sshfs;mount;storage;ssh;
+StartupWMClass=StorageManager

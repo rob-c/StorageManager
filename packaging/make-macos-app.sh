@@ -23,9 +23,40 @@ cp "$binary" "$app/Contents/MacOS/StorageManager"
 chmod +x "$app/Contents/MacOS/StorageManager"
 sed "s/__VERSION__/$version/g" "$here/macos/Info.plist" > "$app/Contents/Info.plist"
 
-# Best-effort app icon from the logo (missing icon just shows a generic one).
+# App icon — the SAME artwork as the Windows build (both come from logo.png).
+# Build the full size ladder and pack a real .icns: prefer macOS's native
+# iconutil, else our own packer. Avoid `convert x.icns`, which Finder often
+# refuses to render.
+icns="$app/Contents/Resources/AppIcon.icns"
 if command -v convert >/dev/null 2>&1 && [ -f "$logo" ]; then
-  convert "$logo" -resize 512x512 "$app/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+  iconwork="$(mktemp -d)"
+  sizes="16 32 64 128 256 512 1024"
+  for s in $sizes; do
+    convert "$logo" -resize "${s}x${s}" "$iconwork/icon_${s}.png" 2>/dev/null || true
+  done
+  if command -v iconutil >/dev/null 2>&1; then
+    # iconutil consumes a .iconset with Apple's canonical @1x/@2x filenames.
+    set="$iconwork/StorageManager.iconset"; mkdir -p "$set"
+    cp "$iconwork/icon_16.png"   "$set/icon_16x16.png"
+    cp "$iconwork/icon_32.png"   "$set/icon_16x16@2x.png"
+    cp "$iconwork/icon_32.png"   "$set/icon_32x32.png"
+    cp "$iconwork/icon_64.png"   "$set/icon_32x32@2x.png"
+    cp "$iconwork/icon_128.png"  "$set/icon_128x128.png"
+    cp "$iconwork/icon_256.png"  "$set/icon_128x128@2x.png"
+    cp "$iconwork/icon_256.png"  "$set/icon_256x256.png"
+    cp "$iconwork/icon_512.png"  "$set/icon_256x256@2x.png"
+    cp "$iconwork/icon_512.png"  "$set/icon_512x512.png"
+    cp "$iconwork/icon_1024.png" "$set/icon_512x512@2x.png"
+    iconutil -c icns "$set" -o "$icns" 2>/dev/null || true
+  fi
+  if [ ! -f "$icns" ]; then
+    specs=""
+    for s in $sizes; do
+      [ -f "$iconwork/icon_${s}.png" ] && specs="$specs ${s}:$iconwork/icon_${s}.png"
+    done
+    python3 "$here/make-icns.py" "$icns" $specs 2>/dev/null || true
+  fi
+  rm -rf "$iconwork"
 fi
 
 # Best-effort ad-hoc signature (required for unsigned binaries to launch on Apple

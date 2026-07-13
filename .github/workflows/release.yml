@@ -51,9 +51,10 @@ jobs:
           # Windows: the plain exe is already double-clickable.
           cp dist/win-x64/StorageManager.exe out/StorageManager-win-x64.exe
 
-          # Linux: mark executable and tar.gz it so the +x bit survives download.
+          # Linux: bundle the binary with a .desktop entry + icon (shows the
+          # logo in menus and file managers) and tar.gz it so +x survives.
           chmod +x dist/linux-x64/StorageManager
-          tar -C dist/linux-x64 -czf out/StorageManager-linux-x64.tar.gz StorageManager
+          bash packaging/make-linux-tarball.sh dist/linux-x64/StorageManager "$VERSION" out
 
           # macOS: build a double-clickable .app bundle per arch, zipped (keeps +x).
           for arch in osx-x64 osx-arm64; do

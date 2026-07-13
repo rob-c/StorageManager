@@ -85,8 +85,13 @@ page — no .NET install needed, they're self-contained:
   `StorageManager-osx-x64.zip` (Intel). Unzip to get `StorageManager.app` and
   **double-click it in Finder**. It's unsigned, so the first time: right-click →
   Open (or `xattr -cr StorageManager.app` to clear the download quarantine).
-- **Linux** — `StorageManager-linux-x64.tar.gz`; `tar xzf` it and run
-  `./StorageManager` (the archive keeps the executable bit).
+- **Linux** — `StorageManager-linux-x64.tar.gz`; `tar xzf` it to get a
+  `StorageManager/` folder (the archive keeps the executable bit). Run
+  `./StorageManager`, or `./install.sh` to add it to your application menu with
+  its logo (also shown in file managers like Dolphin/Nautilus); `./install.sh
+  --uninstall` removes it.
+
+All three platforms show the same logo.
 
 Verify against `SHA256SUMS.txt` published with each release.
 
