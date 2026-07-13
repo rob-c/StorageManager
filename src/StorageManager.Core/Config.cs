@@ -49,9 +49,34 @@ public sealed record Config(
         "/home/$USER",
         null,
         [
-            new("staff.ph.ed.ac.uk", TwoFactorPam: false),
-            new("phcomputeppe01.ph.ed.ac.uk", TwoFactorPam: false),
-            new("t3-mw2.ph.ed.ac.uk", TwoFactorPam: false),
+            // Login/desktop hosts share the Edinburgh datastore paths; staff also
+            // exposes the datastore group/personal roots, while the batch/Tier-3
+            // hosts add the GridPP pool-home area (only present there).
+            new("staff.ph.ed.ac.uk", TwoFactorPam: false, RemotePaths:
+            [
+                "/home/$USER",
+                "/storage/datastore-personal/$USER",
+                "/storage/datastore-personal",
+                "/storage/datastore-group/PPE",
+                "/storage/datastore-group",
+                "/localdisk",
+            ]),
+            new("phcomputeppe01.ph.ed.ac.uk", TwoFactorPam: false, RemotePaths:
+            [
+                "/home/$USER",
+                "/storage/datastore-personal/$USER",
+                "/storage/datastore-group/PPE",
+                "/mnt/gridpp/poolhomes/PPEGroup",
+                "/localdisk",
+            ]),
+            new("t3-mw2.ph.ed.ac.uk", TwoFactorPam: false, RemotePaths:
+            [
+                "/home/$USER",
+                "/storage/datastore-personal/$USER",
+                "/storage/datastore-group/PPE",
+                "/mnt/gridpp/poolhomes/PPEGroup",
+                "/localdisk",
+            ]),
             new("lxplus.cern.ch", TwoFactorPam: true, RemotePaths:
             [
                 "/afs/cern.ch/user/$USER1/$USER",

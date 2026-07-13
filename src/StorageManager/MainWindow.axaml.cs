@@ -29,7 +29,6 @@ public partial class MainWindow : Window
         $"/home/{UserToken}",
         $"/storage/datastore-personal/{UserToken}",
         "/storage/datastore-group/PPE",
-        "/mnt/gridpp/poolhomes/PPEGroup",
         "/localdisk",
     ];
 
