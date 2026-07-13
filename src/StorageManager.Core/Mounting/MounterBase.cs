@@ -222,21 +222,22 @@ public abstract class MounterBase(Config config) : IMounter
 
     // No comma in any -o value: Linux FUSE splits comma-separated -o options, so
     // e.g. "keyboard-interactive,password" would leak a bogus "password" option.
+    // We don't pass "PubkeyAuthentication=no": it's redundant with a single-method
+    // PreferredAuthentications (ssh never tries pubkey), and macOS sshfs rejects it
+    // as an unknown FUSE option instead of forwarding it to ssh.
     private IEnumerable<string> AuthArguments()
     {
         if (Config.TwoFactorPam)
-            return ["-o", "PreferredAuthentications=keyboard-interactive", "-o", "PubkeyAuthentication=no"];
+            return ["-o", "PreferredAuthentications=keyboard-interactive"];
 
         if (Config.JumpHost is not null)
             return Config.UseGssapi
                 // GSSAPI first (ssh's default preference order tries it before
                 // password, which askpass then answers as the fallback).
-                ? ["-o", "GSSAPIAuthentication=yes", "-o", "GSSAPIDelegateCredentials=yes",
-                   "-o", "PubkeyAuthentication=no"]
-                : ["-o", "PreferredAuthentications=password", "-o", "PubkeyAuthentication=no"];
+                ? ["-o", "GSSAPIAuthentication=yes", "-o", "GSSAPIDelegateCredentials=yes"]
+                : ["-o", "PreferredAuthentications=password"];
 
-        return ["-o", "password_stdin", "-o", "PreferredAuthentications=password",
-                "-o", "PubkeyAuthentication=no"];
+        return ["-o", "password_stdin", "-o", "PreferredAuthentications=password"];
     }
 
     private async Task<string> CollectOutputAsync()

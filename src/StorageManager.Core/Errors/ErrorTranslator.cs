@@ -14,6 +14,14 @@ public static class ErrorTranslator
     // Ordered most-specific first.
     private static readonly Rule[] Rules =
     [
+        // macOS: macFUSE's system extension hasn't been approved / loaded.
+        new(new Regex("mount_macfuse|file system is not available|osxfuse|macFUSE|MOUNT_FUSEFS",
+                RegexOptions.IgnoreCase),
+            "macFUSE needs to be approved.",
+            "macOS can't mount until macFUSE is allowed. Open System Settings → Privacy & Security, " +
+            "approve the blocked system software from \"Benjamin Fleischer\" (macFUSE), then restart " +
+            "your Mac and try again. If you haven't installed it, run: brew install macfuse"),
+
         // A jump/gateway (ProxyJump) hop that failed to start. On Windows this is
         // usually SSHFS-Win missing its /bin/sh helper; the mount preflight offers a fix.
         new(new Regex(@"/bin/sh:|banner exchange|Connection to UNKNOWN|ProxyJump|ProxyCommand|hostname nor servname",

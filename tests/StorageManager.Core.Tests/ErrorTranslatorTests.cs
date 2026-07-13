@@ -11,6 +11,7 @@ public class ErrorTranslatorTests
     [InlineData("Host key verification failed.", "known_hosts")]
     [InlineData("ssh: connect to host x port 22: Connection timed out", "VPN")]
     [InlineData("/bin/sh: No such file or directory\nbanner exchange: Connection to UNKNOWN port 65535: Broken pipe\nread: Connection reset by peer", "jump/gateway")]
+    [InlineData("mount_macfuse: the file system is not available (1)\nfuse: unknown option `PubkeyAuthentication=no'", "System Settings")]
     public void Translate_maps_known_stderr(string stderr, string expectGuidanceFragment)
     {
         var e = ErrorTranslator.Translate(stderr, 1, twoFactor: false);
