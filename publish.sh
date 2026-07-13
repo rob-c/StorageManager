@@ -15,6 +15,15 @@ for rid in win-x64 osx-arm64 osx-x64 linux-x64; do
         -o "../../dist/$rid"
 done
 
+# Mark the Unix binaries executable, and package the macOS ones as double-clickable
+# .app bundles (dist/StorageManager-osx-*.zip). VERSION is read from the csproj.
+chmod +x ../../dist/linux-x64/StorageManager
+VERSION=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' StorageManager.csproj | head -1)
+for arch in osx-arm64 osx-x64; do
+    chmod +x "../../dist/$arch/StorageManager"
+    bash "../../packaging/make-macos-app.sh" "../../dist/$arch/StorageManager" "$arch" "${VERSION:-0.0.0}" "../../dist"
+done
+
 [ "$SIGN" = "1" ] || exit 0
 echo "SIGN=1 — signing published binaries"
 

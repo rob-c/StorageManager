@@ -36,14 +36,31 @@ jobs:
               -o "dist/$rid"
           done
 
-      - name: Collect and checksum artifacts
+      # Ad-hoc code signing tool so unsigned macOS binaries launch on Apple
+      # Silicon. Best-effort — the packaging step continues if this fails.
+      - name: Install rcodesign (macOS ad-hoc signing)
+        continue-on-error: true
+        run: cargo install apple-codesign --quiet
+
+      - name: Package and checksum artifacts
         run: |
           set -e
+          VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p out
-          cp dist/win-x64/StorageManager.exe   out/StorageManager-win-x64.exe
-          cp dist/linux-x64/StorageManager     out/StorageManager-linux-x64
-          cp dist/osx-x64/StorageManager       out/StorageManager-osx-x64
-          cp dist/osx-arm64/StorageManager     out/StorageManager-osx-arm64
+
+          # Windows: the plain exe is already double-clickable.
+          cp dist/win-x64/StorageManager.exe out/StorageManager-win-x64.exe
+
+          # Linux: mark executable and tar.gz it so the +x bit survives download.
+          chmod +x dist/linux-x64/StorageManager
+          tar -C dist/linux-x64 -czf out/StorageManager-linux-x64.tar.gz StorageManager
+
+          # macOS: build a double-clickable .app bundle per arch, zipped (keeps +x).
+          for arch in osx-x64 osx-arm64; do
+            chmod +x "dist/$arch/StorageManager"
+            bash packaging/make-macos-app.sh "dist/$arch/StorageManager" "$arch" "$VERSION" out
+          done
+
           cd out && sha256sum * > SHA256SUMS.txt
 
       - name: Create GitHub Release

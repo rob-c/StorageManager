@@ -77,12 +77,16 @@ appears in the app window, the TUI, `--help`, and the diagnostics bundle.
 
 ## Download
 
-Grab the latest binary for your platform from the [Releases](../../releases)
+Grab the latest build for your platform from the [Releases](../../releases)
 page — no .NET install needed, they're self-contained:
 
-- `StorageManager-win-x64.exe` (Windows)
-- `StorageManager-linux-x64` (Linux)
-- `StorageManager-osx-x64` / `StorageManager-osx-arm64` (macOS)
+- **Windows** — `StorageManager-win-x64.exe`; double-click to run.
+- **macOS** — `StorageManager-osx-arm64.zip` (Apple Silicon) or
+  `StorageManager-osx-x64.zip` (Intel). Unzip to get `StorageManager.app` and
+  **double-click it in Finder**. It's unsigned, so the first time: right-click →
+  Open (or `xattr -cr StorageManager.app` to clear the download quarantine).
+- **Linux** — `StorageManager-linux-x64.tar.gz`; `tar xzf` it and run
+  `./StorageManager` (the archive keeps the executable bit).
 
 Verify against `SHA256SUMS.txt` published with each release.
 
