@@ -13,6 +13,10 @@ public sealed class MacMounter(Config config) : UnixMounterBase(config)
 
     protected override string? InstallCommand => "brew install macfuse gromgit/fuse/sshfs-mac";
 
+    // Prefer macFUSE's FSKit backend (user space, no kernel-extension approval).
+    protected override IEnumerable<string> ExtraSshfsArguments =>
+        Config.MacFskitBackend ? ["-o", "backend=fskit"] : [];
+
     protected override string? FindSshfs() =>
         FindOnPath("sshfs", "/usr/local/bin", "/opt/homebrew/bin");
 

@@ -26,7 +26,11 @@ public sealed record Config(
     // Resolve symlinks on the server (sshfs -o follow_symlinks) so a mount path
     // (or entries) that is a symlink — e.g. /scratch → local disk on cplab boxes —
     // is followed transparently, even across devices, instead of failing.
-    bool FollowSymlinks = true)
+    bool FollowSymlinks = true,
+    // macOS only: mount via macFUSE's FSKit backend (sshfs -o backend=fskit), a
+    // user-space file system that needs no kernel-extension approval. Requires
+    // macFUSE 5+ on macOS 15+; disable in mount-config.json for older setups.
+    bool MacFskitBackend = true)
 {
     public const string FileName = "mount-config.json";
 

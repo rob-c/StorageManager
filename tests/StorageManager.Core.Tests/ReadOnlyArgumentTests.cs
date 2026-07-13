@@ -31,6 +31,18 @@ public class ReadOnlyArgumentTests
     }
 
     [Fact]
+    public void Macos_mount_uses_fskit_backend_by_default()
+    {
+        Assert.True(Config.Default.MacFskitBackend);
+        var config = Config.Default with { Gateway = "h", RemotePath = "/x", MountTarget = "/tmp/m" };
+        var args = new MacMounter(config).BuildArguments("jbloggs");
+        Assert.Contains("backend=fskit", args);
+        // Off → not present.
+        Assert.DoesNotContain("backend=fskit",
+            new MacMounter(config with { MacFskitBackend = false }).BuildArguments("jbloggs"));
+    }
+
+    [Fact]
     public void ReadOnly_mount_passes_o_ro()
     {
         var args = ArgsFor(readOnly: true);
