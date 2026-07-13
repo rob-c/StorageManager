@@ -42,6 +42,12 @@ jobs:
         continue-on-error: true
         run: cargo install apple-codesign --quiet
 
+      # ImageMagick isn't on ubuntu-latest by default; needed to scale the app
+      # logo into the macOS .icns size ladder (Linux falls back to the 256px
+      # source, but install it so both build the full-quality icon).
+      - name: Install ImageMagick (icon scaling)
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
       - name: Package and checksum artifacts
         run: |
           set -e

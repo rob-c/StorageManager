@@ -28,13 +28,20 @@ sed "s/__VERSION__/$version/g" "$here/macos/Info.plist" > "$app/Contents/Info.pl
 # iconutil, else our own packer. Avoid `convert x.icns`, which Finder often
 # refuses to render.
 icns="$app/Contents/Resources/AppIcon.icns"
-if command -v convert >/dev/null 2>&1 && [ -f "$logo" ]; then
+if [ -f "$logo" ]; then
   iconwork="$(mktemp -d)"
   sizes="16 32 64 128 256 512 1024"
-  for s in $sizes; do
-    convert "$logo" -resize "${s}x${s}" "$iconwork/icon_${s}.png" 2>/dev/null || true
-  done
-  if command -v iconutil >/dev/null 2>&1; then
+  if command -v convert >/dev/null 2>&1; then
+    for s in $sizes; do
+      convert "$logo" -resize "${s}x${s}" "$iconwork/icon_${s}.png" 2>/dev/null || true
+    done
+  fi
+  # Fallback with no image tooling: the source logo is already 256x256, so use
+  # it directly as the 256px entry — a single-size .icns still renders in Finder.
+  [ -f "$iconwork/icon_256.png" ] || cp "$logo" "$iconwork/icon_256.png"
+  have_ladder=1
+  for s in $sizes; do [ -f "$iconwork/icon_${s}.png" ] || have_ladder=0; done
+  if [ "$have_ladder" = 1 ] && command -v iconutil >/dev/null 2>&1; then
     # iconutil consumes a .iconset with Apple's canonical @1x/@2x filenames.
     set="$iconwork/StorageManager.iconset"; mkdir -p "$set"
     cp "$iconwork/icon_16.png"   "$set/icon_16x16.png"
