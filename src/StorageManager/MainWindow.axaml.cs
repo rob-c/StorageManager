@@ -120,14 +120,16 @@ public partial class MainWindow : Window
             ApplyDefaultJumpForHost();
         }
 
-        // The single app-wide Kerberos switch: restored from settings, persisted on
-        // toggle, and consulted by jump connects, the Status view, and startup.
-        KerberosCheck.IsChecked = _saved.UseKerberos;
-        KerberosCheck.IsCheckedChanged += (_, _) =>
+        // Kerberos sign-in is temporarily disabled: hide the tickbox, force it off,
+        // and clear any previously-saved preference so nothing attempts Kerberos.
+        // (Re-enable by restoring the settings-bound checkbox below.)
+        KerberosCheck.IsChecked = false;
+        KerberosCheck.IsVisible = false;
+        if (_saved.UseKerberos)
         {
-            _saved = _saved with { UseKerberos = KerberosCheck.IsChecked == true };
+            _saved = _saved with { UseKerberos = false };
             _settingsStore.Save(_saved);
-        };
+        }
 
         _watchdog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _watchdog.Tick += OnWatchdogTick;

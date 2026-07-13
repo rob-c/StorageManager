@@ -210,7 +210,6 @@ public static class TerminalApp
         catch (Exception ex) { AnsiConsole.MarkupLineInterpolated($"[red]{ex.Message}[/]"); return; }
 
         var connector = new StorageManager.Gui.JumpConnector(config);
-        var saved = SettingsStore.Default.Load();
 
         var target = AnsiConsole.Prompt(new TextPrompt<string>("Final [green]target[/]:").DefaultValue("cplab175.ph.ed.ac.uk"));
         var jump = AnsiConsole.Prompt(new SelectionPrompt<string>().Title("Jump [green]host[/]").AddChoices(config.JumpHostList));
@@ -218,22 +217,8 @@ public static class TerminalApp
         var mount = AnsiConsole.Prompt(new TextPrompt<string>("Mount [green]location[/]:")
             .DefaultValue(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "S-remote")));
 
-        // Defaults to the app-wide Kerberos switch; the answer is saved back so the
-        // GUI tickbox and this prompt stay one setting.
-        var useKerberos = AnsiConsole.Confirm(
-            "Use [yellow]Kerberos[/] sign-in? (otherwise your password is used on both hops)",
-            saved.UseKerberos);
-        if (useKerberos != saved.UseKerberos)
-            SettingsStore.Default.Save(saved with { UseKerberos = useKerberos });
-
-        // Kerberos tools are only a prerequisite when Kerberos is chosen.
-        if (useKerberos && connector.KerberosPreflight() is { } problem)
-        {
-            AnsiConsole.MarkupLineInterpolated($"[red]{problem.Message}[/]");
-            if (problem.Fix is { Kind: StorageManager.Errors.FixKindUi.CopyCommand } fix)
-                AnsiConsole.MarkupLineInterpolated($"[yellow]Run:[/] {fix.Payload}");
-            return;
-        }
+        // Kerberos sign-in is temporarily disabled: always use the password on both hops.
+        const bool useKerberos = false;
 
         var password = AnsiConsole.Prompt(new TextPrompt<string>("[green]Password[/]:").Secret());
 
@@ -271,7 +256,7 @@ public static class TerminalApp
             .DefaultValue("/afs/cern.ch/user,/eos/user"));
         var paths = pathsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        var useKerberos = SettingsStore.Default.Load().UseKerberos;
+        const bool useKerberos = false; // Kerberos temporarily disabled.
         var service = StorageManager.Status.StatusService.CreateDefault(useKerberos);
 
         if (useKerberos && AnsiConsole.Confirm("Get a Kerberos ticket first (kinit)?", false))
